@@ -1,292 +1,273 @@
-﻿
 <!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>MicroClinic — Demo</title>
+    <title>TeachMeBack — Learn by Teaching</title>
     <style>
       :root{
         --bg:#f6f9fc; --card:#ffffff; --muted:#6b7280; --accent1:#5b8cff; --accent2:#7b61ff; --danger:#ef4444; --warn:#f59e0b; --ok:#10b981;
       }
       *{box-sizing:border-box}
-      body{font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif;background:linear-gradient(180deg,#eef2ff 0%, #f8fafc 60%);margin:0;color:#0f172a}
+      body{font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif;background:linear-gradient(180deg,#eef2ff 0%, #f8fafc 60%);margin:0;color:#0f172a;min-height:100vh}
       header{padding:28px 32px;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;display:flex;align-items:center;gap:16px}
-      .logo{width:46px;height:46px;border-radius:10px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-weight:700}
+      .logo{width:46px;height:46px;border-radius:10px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
       .title{font-size:20px;font-weight:700}
       .subtitle{font-size:13px;opacity:0.95}
-      main{max-width:1100px;margin:28px auto;padding:0 20px;display:grid;grid-template-columns:1fr 420px;gap:20px}
-      .card{background:var(--card);border-radius:12px;box-shadow:0 6px 18px rgba(15,23,42,0.06);padding:18px}
-      form .row{display:flex;gap:12px}
-      label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
-      input[type=text],input[type=number],textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef8;background:#fbfdff}
-      textarea{min-height:84px}
-      .small{width:120px}
-      .muted{color:var(--muted);font-size:13px}
-      .btn{background:linear-gradient(90deg,var(--accent1),var(--accent2));border:none;color:white;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer}
-      .upload-btn{background:linear-gradient(90deg,#34d399,#06b6d4);color:white;padding:12px 18px;border-radius:12px;font-weight:700;box-shadow:0 8px 24px rgba(6,182,212,0.12);font-size:15px}
-      .btn.secondary{background:#eef2ff;color:var(--accent1);border:1px solid rgba(91,140,255,0.12)}
-      .result{display:none;margin-top:12px;padding:10px;border-radius:8px}
-      .queue{display:flex;flex-direction:column;gap:12px}
-      .case-card{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:10px;border:1px solid #f0f4ff;background:linear-gradient(180deg,#ffffff,#fbfdff)}
-      .case-top{display:flex;justify-content:space-between;align-items:center}
-      .severity{padding:6px 8px;border-radius:999px;font-weight:700;color:white;font-size:12px}
-      .severity.green{background:var(--ok)}
-      .severity.yellow{background:var(--warn);color:#fff}
-      .severity.red{background:var(--danger)}
-      .case-actions{margin-top:8px}
-      .case-actions button{margin-right:8px;padding:8px 10px;border-radius:8px;border:none;cursor:pointer}
-      .case-actions button.accept{background:linear-gradient(90deg,#38bdf8,#06b6d4);color:#fff}
-      .case-actions button.escalate{background:linear-gradient(90deg,#fb7185,#ef4444);color:#fff}
-      .case-actions button.review{background:#eef2ff;color:var(--accent1)}
-      footer{max-width:1100px;margin:18px auto;color:var(--muted);font-size:13px;padding:0 20px}
-      @media (max-width:900px){main{grid-template-columns:1fr;gap:14px;padding:12px} .small{width:100%}}
+      main{max-width:800px;margin:28px auto;padding:0 20px}
+      .card{background:var(--card);border-radius:12px;box-shadow:0 6px 18px rgba(15,23,42,0.06);padding:24px;margin-bottom:20px}
+      h2{margin:0 0 8px 0;color:#0f172a}
+      .muted{color:var(--muted);font-size:14px}
+      .topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:16px}
+      .topic-btn{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:10px;padding:14px;text-align:left;cursor:pointer;transition:all 0.2s;font-size:14px;color:#0369a1;font-weight:500}
+      .topic-btn:hover{background:linear-gradient(135deg,#e0f2fe,#bae6fd);transform:translateY(-2px);box-shadow:0 4px 12px rgba(14,165,233,0.15)}
+      .custom-topic{width:100%;padding:14px;border-radius:10px;border:1px solid #e6eef8;background:#fbfdff;font-size:14px;margin-top:12px}
+      .btn{background:linear-gradient(90deg,var(--accent1),var(--accent2));border:none;color:white;padding:12px 24px;border-radius:10px;font-weight:600;cursor:pointer;font-size:15px}
+      .btn:hover{opacity:0.9}
+      .chat-container{display:none;flex-direction:column;gap:16px;height:500px}
+      .chat-container.active{display:flex}
+      .messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:16px;background:#f8fafc;border-radius:12px}
+      .message{padding:14px 18px;border-radius:18px;max-width:80%;line-height:1.5}
+      .message.ai{background:linear-gradient(135deg,#e0f2fe,#f0f9ff);align-self:flex-start;border-bottom-left-radius:4px}
+      .message.user{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;align-self:flex-end;border-bottom-right-radius:4px}
+      .input-area{display:flex;gap:12px}
+      .input-area input{flex:1;padding:14px;border-radius:12px;border:1px solid #e6eef8;background:#fbfdff;font-size:15px}
+      .input-area input:focus{outline:none;border-color:var(--accent1)}
+      .session-info{background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:16px;border-radius:12px;margin-bottom:16px;border:1px solid #bbf7d0}
+      .session-info h3{margin:0 0 8px 0;color:#166534;font-size:16px}
+      .gaps-section{display:none;margin-top:20px}
+      .gaps-section.active{display:block}
+      .gap-item{background:#fef2f2;border:1px solid #fecaca;padding:12px;border-radius:8px;margin-bottom:8px;color:#991b1b;font-size:13px}
+      .back-btn{background:transparent;border:1px solid rgba(255,255,255,0.3);color:white;padding:8px 16px;border-radius:8px;cursor:pointer;margin-left:auto}
+      .back-btn:hover{background:rgba(255,255,255,0.1)}
+      .topic-display{font-size:18px;font-weight:600;margin-bottom:16px;color:var(--accent1)}
+      .start-screen{display:block}
+      .start-screen.hidden{display:none}
+      .instructions{background:#f0f9ff;border:1px solid #bae6fd;padding:16px;border-radius:10px;margin-bottom:16px;color:#075985}
+      footer{max-width:800px;margin:18px auto;color:var(--muted);font-size:13px;padding:0 20px;text-align:center}
     </style>
   </head>
   <body>
     <header>
-      <div style="display:flex;align-items:center;gap:16px">
-        <div class="logo">MC</div>
-        <div>
-          <div class="title">MicroClinic</div>
-          <div class="subtitle">AI-assisted triage for frontline health workers</div>
-        </div>
+      <div class="logo">📚</div>
+      <div>
+        <div class="title">TeachMeBack</div>
+        <div class="subtitle">Learn by teaching an AI student</div>
       </div>
-      <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
-        <div id="authArea" style="display:flex;align-items:center;gap:8px">
-          <input id="phoneInput" placeholder="phone" style="padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.07);color:white" />
-          <input id="passInput" placeholder="password" type="password" style="padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.07);color:white" />
-          <button id="loginBtn" class="btn secondary">Login</button>
-          <button id="registerBtn" class="btn secondary">Register</button>
-        </div>
-      </div>
+      <button class="back-btn" onclick="showStartScreen()">← New Session</button>
     </header>
 
     <main>
-      <section class="card">
-        <h3 style="margin:0 0 6px 0">Quick Triage</h3>
-        <div class="muted" style="margin-bottom:12px">Fill the form and generate an evidence pack for clinician review.</div>
-        <form id="caseForm">
-          <div style="display:flex;gap:12px;margin-bottom:12px">
-            <div style="flex:1">
-              <label for="patient_name">Patient name</label>
-              <input id="patient_name" required />
-            </div>
-            <div style="width:90px">
-              <label for="age">Age</label>
-              <input id="age" type="number" />
-            </div>
+      <div id="startScreen" class="start-screen">
+        <div class="card">
+          <h2>What do you want to teach?</h2>
+          <p class="muted">Select a topic or enter your own. You'll explain it to an AI that asks questions like a curious student.</p>
+          
+          <div class="topic-grid" id="topicGrid"></div>
+          
+          <input type="text" id="customTopic" class="custom-topic" placeholder="Or type your own topic..." />
+          
+          <div style="margin-top:16px">
+            <label class="muted">Your level:</label>
+            <select id="userLevel" style="padding:10px;border-radius:8px;border:1px solid #e6eef8;margin-left:10px">
+              <option value="elementary">Elementary School</option>
+              <option value="middle_school">Middle School</option>
+              <option value="high_school" selected>High School</option>
+              <option value="college">College</option>
+            </select>
           </div>
+          
+          <button class="btn" style="margin-top:20px" onclick="startSession()">Start Teaching →</button>
+        </div>
+      </div>
 
-          <div style="margin-bottom:12px">
-            <label for="symptoms">Symptoms</label>
-            <input id="symptoms" placeholder="e.g. cough, fever" />
-          </div>
-
-          <div class="row" style="margin-bottom:12px">
-            <div style="flex:1">
-              <label for="temperature">Temperature (°C)</label>
-              <input id="temperature" type="number" step="0.1" />
-            </div>
-            <div style="width:140px">
-              <label for="sob">Shortness of breath</label>
-              <select id="sob"><option value="false">No</option><option value="true">Yes</option></select>
-            </div>
-            <div style="width:140px">
-              <label for="oxygen">Oxygen (%)</label>
-              <input id="oxygen" type="number" />
-            </div>
-          </div>
-
-          <div style="margin-bottom:12px">
-            <label for="notes">Notes</label>
-            <textarea id="notes"></textarea>
-          </div>
-
-          <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
-            <div style="flex:1">
-              <label>Image <span style="color:#ef4444">*</span> (required)</label>
-              <div style="display:flex;align-items:center;gap:12px">
-                <input id="imageFile" type="file" accept="image/*" style="display:none" />
-                <button id="imageBtn" type="button" class="btn upload-btn">Upload image</button>
-                <span id="imageName" class="muted">No file chosen</span>
-              </div>
-              <img id="imagePreview" alt="preview" style="max-width:160px;margin-top:8px;border-radius:8px;display:none;box-shadow:0 6px 18px rgba(15,23,42,0.06)" />
-            </div>
-            <div style="width:180px;display:flex;align-items:center">
-              <label style="margin:0"><input id="consent" type="checkbox" checked /> I consent</label>
-            </div>
-          </div>
-
-          <div style="display:flex;gap:12px;align-items:center">
-            <button class="btn" type="submit">Submit case</button>
-            <button type="button" class="btn secondary" onclick="document.getElementById('caseForm').reset()">Reset</button>
-            <div id="output" class="result" style="display:none"></div>
-          </div>
-        </form>
-      </section>
-
-      <aside class="card">
-        <h3 style="margin:0 0 8px 0">Clinician Queue</h3>
-        <div class="muted" style="margin-bottom:12px">Review flagged cases and escalate if needed.</div>
-        <div id="cases" class="queue"></div>
-      </aside>
+      <div id="chatContainer" class="chat-container">
+        <div id="blurOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;flex-direction:column;color:white;text-align:center;padding:20px;">
+          <h2>⚠️ Tab Switching Detected</h2>
+          <p>Please return to this tab to continue your teaching session.</p>
+          <p id="tabSwitchWarning" style="color:#fbbf24;font-weight:bold;">Tab switches: 0/5</p>
+          <p style="font-size:14px;color:#9ca3af;margin-top:20px;">Switching tabs too many times will end your session.</p>
+        </div>
+        
+        <div class="session-info">
+          <h3>🎓 Teaching Mode Active <span id="tabMonitor" style="font-size:12px;color:#f59e0b;margin-left:10px;">● Tab Monitoring ON</span></h3>
+          <p style="margin:0;color:#166534" id="sessionTopic"></p>
+        </div>
+        
+        <div class="topic-display" id="topicDisplay"></div>
+        
+        <div class="messages" id="messages"></div>
+        
+        <div class="input-area">
+          <input type="text" id="userInput" placeholder="Explain the concept to your AI student..." onkeypress="if(event.key==='Enter')sendMessage()" />
+          <button class="btn" onclick="sendMessage()">Send</button>
+        </div>
+        
+        <div class="gaps-section" id="gapsSection">
+          <h3 style="color:#991b1b">📌 Knowledge Gaps Identified</h3>
+          <div id="gapsList"></div>
+        </div>
+      </div>
     </main>
 
     <footer>
-      MicroClinic — demo only. Not a medical device. Clinician confirmation required for any action.
+      TeachMeBack — Learn more by teaching. The best way to learn is to teach.
     </footer>
 
     <script>
       const API = 'http://localhost:8000/api'
+      let currentSessionId = null
+      let currentTopic = ''
 
-      function severityClass(s){
-        if(!s) return 'green'
-        return (s==='red')? 'red': (s==='yellow')? 'yellow':'green'
+      const topics = [
+        "Photosynthesis",
+        "Quadratic Equations",
+        "The Water Cycle",
+        "Newton's Laws of Motion",
+        "DNA and Genetics",
+        "Supply and Demand",
+        "World War II",
+        "Cellular Respiration",
+        "Pythagorean Theorem",
+        "Chemical Bonds"
+      ]
+
+      function init() {
+        const grid = document.getElementById('topicGrid')
+        topics.forEach(topic => {
+          const btn = document.createElement('div')
+          btn.className = 'topic-btn'
+          btn.textContent = topic
+          btn.onclick = () => {
+            document.getElementById('customTopic').value = topic
+          }
+          grid.appendChild(btn)
+        })
       }
 
-      function apiFetch(path, opts = {}){
-        const url = (path.startsWith('http') ? path : API + (path.startsWith('/') ? path : '/' + path));
-        opts = Object.assign({}, opts)
-        opts.headers = Object.assign({}, opts.headers || {})
-        const token = localStorage.getItem('microclinic_token')
-        if(token) opts.headers['Authorization'] = 'Bearer ' + token
-        return fetch(url, opts)
-      }
+      let tabSwitchCount = 0
+      let isSessionActive = false
 
-      function showResult(msg, type){
-        const out = document.getElementById('output'); out.style.display='block'; out.style.background=(type==='error')? '#ffefef':'#f0fdf4'; out.style.border=(type==='error')? '1px solid #fecaca':'1px solid #bbf7d0'; out.style.color=(type==='error')? '#991b1b':'#065f46'; out.innerHTML = msg;
-        setTimeout(()=>{out.style.display='none'}, 6000)
-      }
+      // Tab switching detection
+      document.addEventListener('visibilitychange', function() {
+        const blurOverlay = document.getElementById('blurOverlay')
+        const tabWarning = document.getElementById('tabSwitchWarning')
+        
+        if (document.hidden && isSessionActive) {
+          tabSwitchCount++
+          blurOverlay.style.display = 'flex'
+          if (tabWarning) tabWarning.textContent = `Tab switches: ${tabSwitchCount}/5`
+          
+          if (tabSwitchCount >= 2) {
+            alert('⚠️ Warning: You have switched tabs. Please stay on this page during your teaching session.')
+          }
+          
+          if (tabSwitchCount >= 5) {
+            alert('❌ Session ended due to excessive tab switching.')
+            showStartScreen()
+            isSessionActive = false
+            tabSwitchCount = 0
+          }
+        } else if (!document.hidden && isSessionActive) {
+          blurOverlay.style.display = 'none'
+        }
+      })
 
-      // Manage auth UI
-      function showAuth(){
-        const auth = document.getElementById('authArea')
-        const token = localStorage.getItem('microclinic_token')
-        const user = localStorage.getItem('microclinic_user')
-        if(token && user){
-          auth.innerHTML = `<span style="color:white;margin-right:8px">Logged in: ${user}</span><button id="logoutBtn" class="btn secondary">Logout</button>`
-          document.getElementById('logoutBtn').addEventListener('click', ()=>{ localStorage.removeItem('microclinic_token'); localStorage.removeItem('microclinic_user'); showAuth(); })
-        } else {
-          auth.innerHTML = `\
-            <input id="phoneInput" placeholder="phone" style="padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.07);color:white" />\
-            <input id="passInput" placeholder="password" type="password" style="padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.07);color:white" />\
-            <button id="loginBtn" class="btn secondary">Login</button>\
-            <button id="registerBtn" class="btn secondary">Register</button>`
-          document.getElementById('loginBtn').addEventListener('click', login)
-          document.getElementById('registerBtn').addEventListener('click', register)
+      // Also detect when window loses focus
+      window.addEventListener('blur', function() {
+        if (isSessionActive) {
+          console.log('Window lost focus')
+        }
+      })
+
+      async function startSession() {
+        const topic = document.getElementById('customTopic').value.trim()
+        const level = document.getElementById('userLevel').value
+        
+        if (!topic) {
+          alert('Please select or enter a topic')
+          return
+        }
+
+        currentTopic = topic
+        document.getElementById('sessionTopic').textContent = `Teaching: ${topic} (${level.replace('_', ' ')})`
+        document.getElementById('topicDisplay').textContent = topic
+        tabSwitchCount = 0
+        isSessionActive = true
+
+        try {
+          const res = await fetch(API + '/teachmeback/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic, user_level: level })
+          })
+          
+          const data = await res.json()
+          
+          if (res.ok) {
+            currentSessionId = data.session_id
+            document.getElementById('startScreen').classList.add('hidden')
+            document.getElementById('chatContainer').classList.add('active')
+            
+            const messages = document.getElementById('messages')
+            messages.innerHTML = ''
+            
+            addMessage(data.message, 'ai')
+            addMessage('📝 ' + data.instructions, 'ai')
+          } else {
+            alert('Error: ' + (data.detail || 'Failed to start session'))
+          }
+        } catch (e) {
+          alert('Cannot connect to server. Make sure the backend is running on port 8000.')
+          console.error(e)
         }
       }
 
-      async function login(){
-        const phone = document.getElementById('phoneInput').value
-        const pass = document.getElementById('passInput').value
-        if(!phone || !pass){ showResult('Enter phone and password','error'); return }
-        try{
-          const res = await fetch(API + '/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({phone, password: pass}) })
-          const out = await res.json()
-          if(res.ok){
-            localStorage.setItem('microclinic_token', out.token)
-            localStorage.setItem('microclinic_user', phone)
-            showResult('Logged in','ok')
-            showAuth(); loadCases()
-          } else { showResult('Login failed: '+(out.detail || JSON.stringify(out)),'error') }
-        }catch(e){ showResult('Network error during login','error'); console.error(e) }
+      function addMessage(text, sender) {
+        const messages = document.getElementById('messages')
+        const div = document.createElement('div')
+        div.className = `message ${sender}`
+        div.textContent = text
+        messages.appendChild(div)
+        messages.scrollTop = messages.scrollHeight
       }
 
-      async function register(){
-        const phone = document.getElementById('phoneInput').value
-        const pass = document.getElementById('passInput').value
-        if(!phone || !pass){ showResult('Enter phone and password','error'); return }
-        const admin_code = prompt('Admin code (demo):','')
-        try{
-          const res = await fetch(API + '/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({phone, password: pass, admin_code}) })
-          const out = await res.json()
-          if(res.ok){
-            if(out.token) localStorage.setItem('microclinic_token', out.token)
-            else {
-              // try login after register
-              const lr = await fetch(API + '/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({phone, password: pass}) })
-              const lo = await lr.json()
-              if(lr.ok) localStorage.setItem('microclinic_token', lo.token)
-            }
-            localStorage.setItem('microclinic_user', phone)
-            showResult('Registered and logged in','ok')
-            showAuth(); loadCases()
-          } else { showResult('Register failed: '+(out.detail||JSON.stringify(out)),'error') }
-        }catch(e){ showResult('Network error during register','error'); console.error(e) }
-      }
-
-      async function loadCases(){
-        try{
-          const res = await apiFetch('/cases')
-          const data = await res.json();
-          const container = document.getElementById('cases'); container.innerHTML=''
-          if(!data || data.length===0){ container.innerHTML='<i class="muted">No cases yet</i>'; return }
-          data.reverse().forEach(c=>{
-            const div = document.createElement('div'); div.className='case-card'
-            const sev = c.severity || (c.status || 'green')
-            div.innerHTML = `<div class="case-top"><div><b>${c.patient_name || 'Unknown'}</b> <div class="muted">${c.created_at || ''}</div></div><div><span class="severity ${severityClass(sev)}">${(sev||'green').toUpperCase()}</span></div></div>`+
-              `<div style="font-size:13px;color:#0f172a">Matched: ${(c.matched_rules||[]).join(', ') || '—'}</div>`+
-              `<div style="font-size:13px;color:var(--muted)">${c.notes?('Notes: '+c.notes):''}</div>`+
-              `<div style="margin-top:8px;display:flex;gap:8px;align-items:center"><a href="${API}/cases/${c.id}/evidence" target="_blank" class="btn secondary">Evidence PDF</a></div>`+
-              `<div class="case-actions"><button class="accept" onclick="actionCase('${c.id}','accept')">Accept</button><button class="escalate" onclick="actionCase('${c.id}','escalate')">Escalate</button><button class="review" onclick="actionCase('${c.id}','mark_reviewed')">Mark reviewed</button></div>`;
-            container.appendChild(div)
+      async function sendMessage() {
+        const input = document.getElementById('userInput')
+        const message = input.value.trim()
+        
+        if (!message || !currentSessionId) return
+        
+        addMessage(message, 'user')
+        input.value = ''
+        
+        try {
+          const res = await fetch(API + '/teachmeback/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: currentSessionId, message })
           })
-        }catch(e){ console.error(e); document.getElementById('cases').innerHTML='<i class="muted">Unable to reach backend</i>' }
+          
+          const data = await res.json()
+          
+          if (res.ok) {
+            addMessage(data.message, 'ai')
+          } else {
+            addMessage('Error: ' + (data.detail || 'Failed to get response'), 'ai')
+          }
+        } catch (e) {
+          addMessage('Connection error', 'ai')
+        }
       }
 
-      document.getElementById('caseForm').addEventListener('submit', async (e)=>{
-        e.preventDefault();
-        const name = document.getElementById('patient_name').value || 'Unknown'
-        const age = document.getElementById('age').value
-        const symptoms = document.getElementById('symptoms').value.split(',').map(s=>s.trim()).filter(Boolean)
-        const temperature = document.getElementById('temperature').value
-        const sob = document.getElementById('sob').value === 'true'
-        const oxygen = document.getElementById('oxygen').value
-        const notes = document.getElementById('notes').value
-        const consent = document.getElementById('consent').checked
-        const file = document.getElementById('imageFile').files[0]
-        // Image is required for this flow
-        if(!file){ showResult('Please upload an image before submitting (required)','error'); return }
-        let image_base64 = null
-        if(file){ image_base64 = await new Promise((resolve)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.readAsDataURL(file) }) }
-        const payload = { patient_name: name, age: age?parseInt(age):null, consent, symptoms, temperature: temperature?parseFloat(temperature):null, shortness_of_breath: sob, oxygen_saturation: oxygen?parseInt(oxygen):null, notes, image_base64 }
-        try{
-          const res = await apiFetch('/cases', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
-          const out = await res.json();
-          if(res.ok){ showResult(`<b>Case submitted.</b><br/>Severity: ${out.severity} <br/><a href="${API}/cases/${out.id}/evidence" target="_blank">Open evidence PDF</a>`,'ok') } else { showResult(`<b>Error:</b> ${out.detail || JSON.stringify(out)}`,'error') }
-        }catch(err){ showResult('Network error: unable to reach backend','error'); console.error(err) }
-        await loadCases()
-      })
-
-      async function actionCase(caseId, action){
-        const clinician = prompt('Clinician name (demo):','Dr. Demo')
-        const comment = prompt('Comment (optional):','')
-        try{
-          const res = await apiFetch('/cases/' + caseId + '/action', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action, clinician, comment}) })
-          if(res.ok){ const out = await res.json(); showResult('Action: '+(out.status||'ok'),'ok'); await loadCases() } else { const out = await res.json().catch(()=>null); showResult('Error: '+(out && (out.detail || JSON.stringify(out)) || 'unknown'),'error') }
-        }catch(e){ showResult('Network error while sending action','error'); console.error(e) }
+      function showStartScreen() {
+        document.getElementById('startScreen').classList.remove('hidden')
+        document.getElementById('chatContainer').classList.remove('active')
+        currentSessionId = null
+        document.getElementById('customTopic').value = ''
       }
 
-      // Upload button behavior: proxy click to hidden file input and show preview
-      const imageBtn = document.getElementById('imageBtn')
-      const imageInput = document.getElementById('imageFile')
-      const imageName = document.getElementById('imageName')
-      const imagePreview = document.getElementById('imagePreview')
-      imageBtn.addEventListener('click', ()=> imageInput.click())
-      imageInput.addEventListener('change', (e)=>{
-        const f = e.target.files[0]
-        if(f){
-          imageName.textContent = f.name
-          const r = new FileReader()
-          r.onload = ()=>{ imagePreview.src = r.result; imagePreview.style.display = 'block' }
-          r.readAsDataURL(f)
-        } else { imageName.textContent = 'No file chosen'; imagePreview.style.display = 'none' }
-      })
-
-      showAuth()
-      loadCases()
+      init()
     </script>
   </body>
 </html>
