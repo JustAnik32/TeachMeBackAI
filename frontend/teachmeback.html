@@ -1,0 +1,273 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>TeachMeBack — Learn by Teaching</title>
+    <style>
+      :root{
+        --bg:#f6f9fc; --card:#ffffff; --muted:#6b7280; --accent1:#5b8cff; --accent2:#7b61ff; --danger:#ef4444; --warn:#f59e0b; --ok:#10b981;
+      }
+      *{box-sizing:border-box}
+      body{font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif;background:linear-gradient(180deg,#eef2ff 0%, #f8fafc 60%);margin:0;color:#0f172a;min-height:100vh}
+      header{padding:28px 32px;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;display:flex;align-items:center;gap:16px}
+      .logo{width:46px;height:46px;border-radius:10px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
+      .title{font-size:20px;font-weight:700}
+      .subtitle{font-size:13px;opacity:0.95}
+      main{max-width:800px;margin:28px auto;padding:0 20px}
+      .card{background:var(--card);border-radius:12px;box-shadow:0 6px 18px rgba(15,23,42,0.06);padding:24px;margin-bottom:20px}
+      h2{margin:0 0 8px 0;color:#0f172a}
+      .muted{color:var(--muted);font-size:14px}
+      .topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:16px}
+      .topic-btn{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:10px;padding:14px;text-align:left;cursor:pointer;transition:all 0.2s;font-size:14px;color:#0369a1;font-weight:500}
+      .topic-btn:hover{background:linear-gradient(135deg,#e0f2fe,#bae6fd);transform:translateY(-2px);box-shadow:0 4px 12px rgba(14,165,233,0.15)}
+      .custom-topic{width:100%;padding:14px;border-radius:10px;border:1px solid #e6eef8;background:#fbfdff;font-size:14px;margin-top:12px}
+      .btn{background:linear-gradient(90deg,var(--accent1),var(--accent2));border:none;color:white;padding:12px 24px;border-radius:10px;font-weight:600;cursor:pointer;font-size:15px}
+      .btn:hover{opacity:0.9}
+      .chat-container{display:none;flex-direction:column;gap:16px;height:500px}
+      .chat-container.active{display:flex}
+      .messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:16px;background:#f8fafc;border-radius:12px}
+      .message{padding:14px 18px;border-radius:18px;max-width:80%;line-height:1.5}
+      .message.ai{background:linear-gradient(135deg,#e0f2fe,#f0f9ff);align-self:flex-start;border-bottom-left-radius:4px}
+      .message.user{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;align-self:flex-end;border-bottom-right-radius:4px}
+      .input-area{display:flex;gap:12px}
+      .input-area input{flex:1;padding:14px;border-radius:12px;border:1px solid #e6eef8;background:#fbfdff;font-size:15px}
+      .input-area input:focus{outline:none;border-color:var(--accent1)}
+      .session-info{background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:16px;border-radius:12px;margin-bottom:16px;border:1px solid #bbf7d0}
+      .session-info h3{margin:0 0 8px 0;color:#166534;font-size:16px}
+      .gaps-section{display:none;margin-top:20px}
+      .gaps-section.active{display:block}
+      .gap-item{background:#fef2f2;border:1px solid #fecaca;padding:12px;border-radius:8px;margin-bottom:8px;color:#991b1b;font-size:13px}
+      .back-btn{background:transparent;border:1px solid rgba(255,255,255,0.3);color:white;padding:8px 16px;border-radius:8px;cursor:pointer;margin-left:auto}
+      .back-btn:hover{background:rgba(255,255,255,0.1)}
+      .topic-display{font-size:18px;font-weight:600;margin-bottom:16px;color:var(--accent1)}
+      .start-screen{display:block}
+      .start-screen.hidden{display:none}
+      .instructions{background:#f0f9ff;border:1px solid #bae6fd;padding:16px;border-radius:10px;margin-bottom:16px;color:#075985}
+      footer{max-width:800px;margin:18px auto;color:var(--muted);font-size:13px;padding:0 20px;text-align:center}
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">📚</div>
+      <div>
+        <div class="title">TeachMeBack</div>
+        <div class="subtitle">Learn by teaching an AI student</div>
+      </div>
+      <button class="back-btn" onclick="showStartScreen()">← New Session</button>
+    </header>
+
+    <main>
+      <div id="startScreen" class="start-screen">
+        <div class="card">
+          <h2>What do you want to teach?</h2>
+          <p class="muted">Select a topic or enter your own. You'll explain it to an AI that asks questions like a curious student.</p>
+          
+          <div class="topic-grid" id="topicGrid"></div>
+          
+          <input type="text" id="customTopic" class="custom-topic" placeholder="Or type your own topic..." />
+          
+          <div style="margin-top:16px">
+            <label class="muted">Your level:</label>
+            <select id="userLevel" style="padding:10px;border-radius:8px;border:1px solid #e6eef8;margin-left:10px">
+              <option value="elementary">Elementary School</option>
+              <option value="middle_school">Middle School</option>
+              <option value="high_school" selected>High School</option>
+              <option value="college">College</option>
+            </select>
+          </div>
+          
+          <button class="btn" style="margin-top:20px" onclick="startSession()">Start Teaching →</button>
+        </div>
+      </div>
+
+      <div id="chatContainer" class="chat-container">
+        <div id="blurOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;flex-direction:column;color:white;text-align:center;padding:20px;">
+          <h2>⚠️ Tab Switching Detected</h2>
+          <p>Please return to this tab to continue your teaching session.</p>
+          <p id="tabSwitchWarning" style="color:#fbbf24;font-weight:bold;">Tab switches: 0/5</p>
+          <p style="font-size:14px;color:#9ca3af;margin-top:20px;">Switching tabs too many times will end your session.</p>
+        </div>
+        
+        <div class="session-info">
+          <h3>🎓 Teaching Mode Active <span id="tabMonitor" style="font-size:12px;color:#f59e0b;margin-left:10px;">● Tab Monitoring ON</span></h3>
+          <p style="margin:0;color:#166534" id="sessionTopic"></p>
+        </div>
+        
+        <div class="topic-display" id="topicDisplay"></div>
+        
+        <div class="messages" id="messages"></div>
+        
+        <div class="input-area">
+          <input type="text" id="userInput" placeholder="Explain the concept to your AI student..." onkeypress="if(event.key==='Enter')sendMessage()" />
+          <button class="btn" onclick="sendMessage()">Send</button>
+        </div>
+        
+        <div class="gaps-section" id="gapsSection">
+          <h3 style="color:#991b1b">📌 Knowledge Gaps Identified</h3>
+          <div id="gapsList"></div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      TeachMeBack — Learn more by teaching. The best way to learn is to teach.
+    </footer>
+
+    <script>
+      const API = 'http://localhost:8000/api'
+      let currentSessionId = null
+      let currentTopic = ''
+
+      const topics = [
+        "Photosynthesis",
+        "Quadratic Equations",
+        "The Water Cycle",
+        "Newton's Laws of Motion",
+        "DNA and Genetics",
+        "Supply and Demand",
+        "World War II",
+        "Cellular Respiration",
+        "Pythagorean Theorem",
+        "Chemical Bonds"
+      ]
+
+      function init() {
+        const grid = document.getElementById('topicGrid')
+        topics.forEach(topic => {
+          const btn = document.createElement('div')
+          btn.className = 'topic-btn'
+          btn.textContent = topic
+          btn.onclick = () => {
+            document.getElementById('customTopic').value = topic
+          }
+          grid.appendChild(btn)
+        })
+      }
+
+      let tabSwitchCount = 0
+      let isSessionActive = false
+
+      // Tab switching detection
+      document.addEventListener('visibilitychange', function() {
+        const blurOverlay = document.getElementById('blurOverlay')
+        const tabWarning = document.getElementById('tabSwitchWarning')
+        
+        if (document.hidden && isSessionActive) {
+          tabSwitchCount++
+          blurOverlay.style.display = 'flex'
+          if (tabWarning) tabWarning.textContent = `Tab switches: ${tabSwitchCount}/5`
+          
+          if (tabSwitchCount >= 2) {
+            alert('⚠️ Warning: You have switched tabs. Please stay on this page during your teaching session.')
+          }
+          
+          if (tabSwitchCount >= 5) {
+            alert('❌ Session ended due to excessive tab switching.')
+            showStartScreen()
+            isSessionActive = false
+            tabSwitchCount = 0
+          }
+        } else if (!document.hidden && isSessionActive) {
+          blurOverlay.style.display = 'none'
+        }
+      })
+
+      // Also detect when window loses focus
+      window.addEventListener('blur', function() {
+        if (isSessionActive) {
+          console.log('Window lost focus')
+        }
+      })
+
+      async function startSession() {
+        const topic = document.getElementById('customTopic').value.trim()
+        const level = document.getElementById('userLevel').value
+        
+        if (!topic) {
+          alert('Please select or enter a topic')
+          return
+        }
+
+        currentTopic = topic
+        document.getElementById('sessionTopic').textContent = `Teaching: ${topic} (${level.replace('_', ' ')})`
+        document.getElementById('topicDisplay').textContent = topic
+        tabSwitchCount = 0
+        isSessionActive = true
+
+        try {
+          const res = await fetch(API + '/teachmeback/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic, user_level: level })
+          })
+          
+          const data = await res.json()
+          
+          if (res.ok) {
+            currentSessionId = data.session_id
+            document.getElementById('startScreen').classList.add('hidden')
+            document.getElementById('chatContainer').classList.add('active')
+            
+            const messages = document.getElementById('messages')
+            messages.innerHTML = ''
+            
+            addMessage(data.message, 'ai')
+            addMessage('📝 ' + data.instructions, 'ai')
+          } else {
+            alert('Error: ' + (data.detail || 'Failed to start session'))
+          }
+        } catch (e) {
+          alert('Cannot connect to server. Make sure the backend is running on port 8000.')
+          console.error(e)
+        }
+      }
+
+      function addMessage(text, sender) {
+        const messages = document.getElementById('messages')
+        const div = document.createElement('div')
+        div.className = `message ${sender}`
+        div.textContent = text
+        messages.appendChild(div)
+        messages.scrollTop = messages.scrollHeight
+      }
+
+      async function sendMessage() {
+        const input = document.getElementById('userInput')
+        const message = input.value.trim()
+        
+        if (!message || !currentSessionId) return
+        
+        addMessage(message, 'user')
+        input.value = ''
+        
+        try {
+          const res = await fetch(API + '/teachmeback/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: currentSessionId, message })
+          })
+          
+          const data = await res.json()
+          
+          if (res.ok) {
+            addMessage(data.message, 'ai')
+          } else {
+            addMessage('Error: ' + (data.detail || 'Failed to get response'), 'ai')
+          }
+        } catch (e) {
+          addMessage('Connection error', 'ai')
+        }
+      }
+
+      function showStartScreen() {
+        document.getElementById('startScreen').classList.remove('hidden')
+        document.getElementById('chatContainer').classList.remove('active')
+        currentSessionId = null
+        document.getElementById('customTopic').value = ''
+      }
+
+      init()
+    </script>
+  </body>
+</html>

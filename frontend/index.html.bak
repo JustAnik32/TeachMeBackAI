@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>MicroClinic — Demo</title>
+    <style>
+      body{font-family: Arial, Helvetica, sans-serif; margin:20px}
+      label{display:block; margin-top:8px}
+      input, textarea, select{width:100%; padding:8px}
+      .btn{margin-top:12px; padding:8px 12px}
+      .result{margin-top:16px; padding:8px; border:1px solid #ddd}
+    </style>
+  </head>
+  <body>
+    <h2>MicroClinic — Quick Triage Demo</h2>
+
+    <form id="caseForm">
+      <label>Patient name<input id="patient_name" required /></label>
+      <label>Age<input id="age" type="number" /></label>
+      <label>Symptoms (comma-separated)<input id="symptoms" /></label>
+      <label>Temperature (°C)<input id="temperature" type="number" step="0.1" /></label>
+      <label>Shortness of breath<select id="sob"><option value="false">No</option><option value="true">Yes</option></select></label>
+      <label>Oxygen saturation (%)<input id="oxygen" type="number" /></label>
+      <label>Notes<textarea id="notes"></textarea></label>
+      <label>Image (optional)<input id="imageFile" type="file" accept="image/*" /></label>
+      <label><input id="consent" type="checkbox" checked /> I consent to data collection for this demo</label>
+      <button class="btn" type="submit">Submit case</button>
+    </form>
+
+    <div id="output" class="result" style="display:none"></div>
+
+    <h3>Clinician Queue</h3>
+    <div id="cases"></div>
+
+    <script>
+      const API = 'http://localhost:8000/api'
+
+      async function loadCases(){
+        const res = await fetch(API + '/cases')
+        const data = await res.json()
+        const container = document.getElementById('cases')
+        container.innerHTML = ''
+        if(!data.length) container.innerHTML = '<i>No cases yet</i>'
+        data.reverse().forEach(c=>{
+          const div = document.createElement('div')
+          div.style.border='1px solid #eee'; div.style.padding='8px'; div.style.marginTop='8px'
+          div.innerHTML = `<b>${c.patient_name}</b> — <i>${c.severity}</i> <br/>`+
+            `Created: ${c.created_at} <br/>`+
+            `Matched: ${(c.matched_rules||[]).join(', ')} <br/>`+
+            `<a href="${API}/cases/${c.id}/evidence" target="_blank">Download evidence PDF</a>`
+          container.appendChild(div)
+        })
+      }
+
+      document.getElementById('caseForm').addEventListener('submit', async (e)=>{
+        e.preventDefault()
+        const name = document.getElementById('patient_name').value
+        const age = document.getElementById('age').value
+        const symptoms = document.getElementById('symptoms').value.split(',').map(s=>s.trim()).filter(Boolean)
+        const temperature = document.getElementById('temperature').value
+        const sob = document.getElementById('sob').value === 'true'
+        const oxygen = document.getElementById('oxygen').value
+        const notes = document.getElementById('notes').value
+        const consent = document.getElementById('consent').checked
+        const file = document.getElementById('imageFile').files[0]
+
+        let image_base64 = null
+        if(file){
+          image_base64 = await new Promise((resolve)=>{
+            const r = new FileReader(); r.onload = ()=>resolve(r.result); r.readAsDataURL(file)
+          })
+        }
+
+        const payload = { patient_name: name, age: age?parseInt(age):null, consent, symptoms, temperature: temperature?parseFloat(temperature):null, shortness_of_breath: sob, oxygen_saturation: oxygen?parseInt(oxygen):null, notes, image_base64 }
+
+        const res = await fetch(API + '/cases', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+        const out = await res.json()
+        const output = document.getElementById('output')
+        output.style.display='block'
+        if(res.ok){
+          output.innerHTML = `<b>Case submitted.</b><br/>Severity: ${out.severity} <br/> <a href="${API}/cases/${out.id}/evidence" target="_blank">Open evidence PDF</a>`
+        }else{
+          output.innerHTML = `<b>Error:</b> ${out.detail || JSON.stringify(out)}`
+        }
+        await loadCases()
+      })
+
+      loadCases()
+    </script>
+  </body>
+</html>

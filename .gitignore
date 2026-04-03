@@ -1,0 +1,25 @@
+# MicroClinic MVP - TeachMeBack
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.env
+.venv/
+venv/
+ENV/
+.IDEA/
+.git/
+*.log
+.DS_Store
+Thumbs.db
+backend/data/
+backend/uploads/
+*.db
+*.sqlite3
