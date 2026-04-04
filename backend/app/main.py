@@ -4,7 +4,7 @@ from typing import Optional, List
 import os
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import hmac
 import hashlib
@@ -259,7 +259,7 @@ def case_action(case_id: str, payload: ActionIn, authorization: Optional[str] = 
         raise HTTPException(status_code=404, detail='Case not found')
     action = (payload.action or '').lower()
     updates = {}
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     # record who performed the action
     updates['action_by'] = user.get('id')
     updates['action_by_name'] = user.get('name')
@@ -358,7 +358,7 @@ def start_teachmeback_session(payload: TeachMeBackSessionIn):
         'user_level': payload.user_level,
         'messages': [],
         'knowledge_gaps': [],
-        'created_at': datetime.utcnow().isoformat()
+        'created_at': datetime.now(timezone.utc).isoformat()
     }
 
     try:
@@ -550,7 +550,7 @@ def provide_feedback(payload: TeachMeBackFeedbackIn):
         gap = {
             'topic': session['topic'],
             'user_correction': payload.user_explanation,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         session['knowledge_gaps'].append(gap)
         data_store.update_teachmeback_session(payload.session_id, session)

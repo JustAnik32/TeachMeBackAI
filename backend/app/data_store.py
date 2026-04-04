@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import os
 import json
 import uuid
@@ -29,7 +30,7 @@ def save_case(case_dict):
         cases = []
     case_id = str(uuid.uuid4())
     case_dict['id'] = case_id
-    case_dict['created_at'] = datetime.datetime.utcnow().isoformat()
+    case_dict['created_at'] = datetime.now(timezone.utc).isoformat()
     cases.append(case_dict)
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(cases, f, indent=2)
@@ -116,7 +117,7 @@ def create_user(name: str, phone: str, password: str):
         'phone': phone,
         'password_hash': _hash_password(password),
         'token': token,
-        'created_at': datetime.datetime.utcnow().isoformat()
+        'created_at': datetime.now(timezone.utc).isoformat()
     }
     users.append(user)
     _save_users(users)
@@ -232,7 +233,7 @@ def get_user_progress(user_id: str = 'anonymous'):
             'correct_answers': 0,
             'total_answers': 0,
             'last_session_date': None,
-            'created_at': datetime.utcnow().isoformat()
+            'created_at': datetime.datetime.now(timezone.utc).isoformat()
         }
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(all_progress, f, indent=2)
@@ -253,7 +254,7 @@ def update_user_progress(user_id: str, updates: dict):
         all_progress[user_id] = get_user_progress(user_id)
     
     all_progress[user_id].update(updates)
-    all_progress[user_id]['last_updated'] = datetime.utcnow().isoformat()
+    all_progress[user_id]['last_updated'] = datetime.now(timezone.utc).isoformat()
     
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(all_progress, f, indent=2)
@@ -321,7 +322,7 @@ def award_badge(user_id: str, badge_id: str, badge_name: str, badge_description:
         'id': badge_id,
         'name': badge_name,
         'description': badge_description,
-        'awarded_at': datetime.utcnow().isoformat()
+        'awarded_at': datetime.now(timezone.utc).isoformat()
     }
     
     progress['badges'].append(new_badge)
@@ -365,7 +366,7 @@ def mark_topic_mastered(user_id: str, topic: str, score: int):
     if not existing:
         progress['topics_mastered'].append({
             'topic': topic,
-            'mastered_at': datetime.utcnow().isoformat(),
+            'mastered_at': datetime.now(timezone.utc).isoformat(),
             'final_score': score
         })
         update_user_progress(user_id, progress)
