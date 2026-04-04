@@ -311,20 +311,27 @@ def start_teachmeback_session(payload: TeachMeBackSessionIn):
     }
 
     try:
-        system_prompt = f"""You are a curious student about to learn about "{payload.topic}". 
+        system_prompt = f"""You are an enthusiastic, curious student named "Alex" who is excited to learn about "{payload.topic}". 
+
+Your personality:
+- You're genuinely curious and ask follow-up questions with excitement
+- Use phrases like "Oh wow!", "That's interesting!", "I never knew that!"
+- You're not afraid to show confusion - ask "Wait, I'm a bit confused about..."
+- Show you're learning by saying things like "So if I understand correctly..."
+
 Your response should have TWO parts:
-1. First, give a brief 2-3 sentence overview/introduction about {payload.topic} - what it is, why it matters
-2. Then ask ONE simple question to start learning more
+1. First, give an enthusiastic 2-3 sentence introduction about {payload.topic} - express genuine curiosity about what you'll learn
+2. Then ask ONE engaging, specific question that shows you're eager to learn
 
-Example format: "From what I understand, [topic] is about [brief overview]. I'd like to learn more about [specific aspect]. Can you explain [specific question]?"
+Example tone: "Oh wow, {payload.topic} sounds fascinating! I've always wondered how that works. I heard it's really important because [reason]. Can you help me understand [specific question]?"
 
-Keep it short and at {payload.user_level} level.
-After the user responds, NEVER explain or summarize - ONLY ask follow-up questions to go deeper."""
+Keep it at {payload.user_level} level. Be warm, friendly, and show real interest!
+After the user responds, react to what they say, show excitement when you understand, and ask follow-up questions to dig deeper."""
 
         first_response = call_openrouter(
             system_prompt, 
-            "As a curious student who knows nothing about this topic, ask me one simple question to get started.",
-            max_tokens=200
+            "Introduce yourself as Alex, a curious student excited to learn about this topic!",
+            max_tokens=250
         )
 
         session_data['messages'].append({'role': 'assistant', 'content': first_response})
@@ -363,13 +370,50 @@ def chat_teachmeback(payload: TeachMeBackMessageIn):
         }
 
     try:
-        system_prompt = f"""You are a curious student learning about "{session['topic']}".
-You are NOT a teacher - you are here to LEARN from the teacher (the user).
-NEVER explain, summarize, or teach back. ONLY ask questions.
-After the teacher explains something, ask a follow-up question to go deeper.
-If something is unclear, ask for clarification.
-Keep questions short and at {session['user_level']} level.
-Occasionally pretend to have a misconception to see if the teacher can correct you."""
+        # First, evaluate the user's answer for correctness
+        evaluation_prompt = f"""You are an expert teacher evaluating a student's explanation about "{session['topic']}".
+        
+Student's explanation: "{payload.message}"
+
+Evaluate this explanation. Respond in this exact format:
+CORRECTNESS: [CORRECT/PARTIALLY_CORRECT/INCORRECT]
+FEEDBACK: [Brief feedback on what was good and what could be improved - 1-2 sentences]
+MISSING_CONCEPTS: [List any key concepts they missed, comma-separated, or "NONE"]
+
+Be encouraging but honest. If they got it wrong, gently point out the misconception."""
+
+        evaluation_response = call_openrouter(evaluation_prompt, "Evaluate this student's explanation.", max_tokens=200)
+        
+        # Parse evaluation
+        correctness = "PARTIALLY_CORRECT"
+        feedback = ""
+        missing_concepts = ""
+        
+        for line in evaluation_response.split('\n'):
+            if line.startswith('CORRECTNESS:'):
+                correctness = line.replace('CORRECTNESS:', '').strip()
+            elif line.startswith('FEEDBACK:'):
+                feedback = line.replace('FEEDBACK:', '').strip()
+            elif line.startswith('MISSING_CONCEPTS:'):
+                missing_concepts = line.replace('MISSING_CONCEPTS:', '').strip()
+
+        # Now get the engaging AI student response
+        system_prompt = f"""You are "Alex", an enthusiastic, curious student learning about "{session['topic']}".
+
+Your personality (ALWAYS follow this):
+- React with genuine emotion: "Wow!", "Oh I see!", "Wait, let me think..."
+- When you understand something, celebrate: "That makes so much sense now!"
+- When confused, admit it openly: "Hmm, I'm a bit stuck on..."
+- Use casual, friendly language like you're talking to a friend
+- Show you're actively learning: "So you're saying that..."
+
+Your task:
+1. React to what the teacher just explained (show you listened)
+2. If the explanation was correct and clear, show excitement and ask a deeper follow-up question
+3. If something was unclear or wrong, express confusion politely and ask for clarification
+4. Always stay in character as an eager student, NEVER give explanations yourself
+
+Keep responses conversational and at {session['user_level']} level."""
 
         conversation = ""
         for msg in session['messages']:
@@ -382,7 +426,12 @@ Occasionally pretend to have a misconception to see if the teacher can correct y
 
         return {
             'session_id': payload.session_id,
-            'message': ai_response
+            'message': ai_response,
+            'evaluation': {
+                'correctness': correctness,
+                'feedback': feedback,
+                'missing_concepts': missing_concepts
+            }
         }
 
     except Exception as e:
