@@ -232,7 +232,7 @@ def get_user_progress(user_id: str = 'anonymous'):
             'correct_answers': 0,
             'total_answers': 0,
             'last_session_date': None,
-            'created_at': datetime.datetime.now(timezone.utc).isoformat()
+            'created_at': datetime.now(timezone.utc).isoformat()
         }
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(all_progress, f, indent=2)
