@@ -94,6 +94,7 @@ def check_plagiarism(user_response: str, ai_messages: list) -> dict:
 def check_inappropriate_content(user_message: str) -> dict:
     """Check for insults, abuse, or inappropriate content"""
     import re
+    import random
     
     message_lower = user_message.lower()
     
@@ -110,13 +111,34 @@ def check_inappropriate_content(user_message: str) -> dict:
             detected.append(word)
     
     if detected:
+        # Varied responses to prevent repetition
+        mild_responses = [
+            "Hey, I'm here to help you learn! Let's keep things positive. What would you like to know about this topic?",
+            "I understand learning can be frustrating sometimes. Let's take a deep breath and get back to our topic. What questions do you have?",
+            "Let's focus on the learning! I'm excited to help you understand this better. What part would you like to explore?",
+            "I'm here to support your learning journey. Let's redirect our energy back to the topic. What would you like to learn?",
+            "Everyone has tough moments while learning. Let's keep going! What aspect of this topic interests you most?"
+        ]
+        
+        severe_responses = [
+            "I want to keep this a safe and respectful learning space. Let's either continue learning together or we can pause here.",
+            "This conversation isn't feeling productive. I'm here to help you learn, but I need respect in return. Would you like to continue with the topic?",
+            "Let's reset. I'm designed to help you learn, and I work best when we communicate respectfully. Should we continue?",
+            "I understand emotions can run high, but let's keep this educational. Would you like to explore the topic or take a break?",
+            "I value respectful communication. Let's either get back to learning or end this session on a positive note. What would you prefer?"
+        ]
+        
+        severity = "high" if len(detected) >= 2 else "medium"
+        response = random.choice(severe_responses) if severity == "high" else random.choice(mild_responses)
+        
         return {
             "is_inappropriate": True,
             "detected_words": detected,
-            "severity": "high" if len(detected) >= 2 else "medium"
+            "severity": severity,
+            "response": response
         }
     
-    return {"is_inappropriate": False, "detected_words": [], "severity": "none"}
+    return {"is_inappropriate": False, "detected_words": [], "severity": "none", "response": ""}
 
 
 from . import utils, data_store
@@ -401,24 +423,12 @@ def chat_teachmeback(payload: TeachMeBackMessageIn):
     # Check for inappropriate content (insults, abuse)
     content_check = check_inappropriate_content(payload.message)
     if content_check['is_inappropriate']:
-        warning_message = "🛑 Let's keep our learning environment respectful. I'm here to help you learn! \n\n"
-        
-        if content_check['severity'] == 'high':
-            warning_message += "If you'd like to continue learning, please let me know what topic you'd like to explore. Otherwise, we can end this session."
-            return {
-                'session_id': payload.session_id,
-                'message': warning_message,
-                'inappropriate_detected': True,
-                'warning_count': 1
-            }
-        else:
-            warning_message += "I understand learning can be frustrating sometimes. Let's get back to our topic. What would you like to know about " + session['topic'] + "?"
-            return {
-                'session_id': payload.session_id,
-                'message': warning_message,
-                'inappropriate_detected': True,
-                'warning_count': 1
-            }
+        return {
+            'session_id': payload.session_id,
+            'message': content_check['response'],
+            'inappropriate_detected': True,
+            'warning_count': 1
+        }
 
     try:
         # First, evaluate the user's answer for correctness
