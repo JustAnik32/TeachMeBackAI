@@ -668,7 +668,7 @@
         arCamera.position.y = 2
         arCamera.lookAt(0, 0, 0)
 
-        // Add orbit controls for 360-degree rotation
+        // Add orbit controls for 360-degree rotation (disabled by default)
         arControls = new THREE.OrbitControls(arCamera, arRenderer.domElement)
         arControls.enableDamping = true
         arControls.dampingFactor = 0.05
@@ -676,6 +676,7 @@
         arControls.maxDistance = 20
         arControls.maxPolarAngle = Math.PI / 2
         arControls.enablePan = true
+        arControls.enabled = false  // DISABLED - click to draw only
         arControls.mouseButtons = {
           LEFT: null,  // Disable left click (use for drawing)
           MIDDLE: THREE.MOUSE.DOLLY,  // Middle click to zoom
