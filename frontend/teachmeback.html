@@ -5,50 +5,96 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>TeachMeBack — Learn by Teaching</title>
     <style>
-      :root{
-        --bg:#f6f9fc; --card:#ffffff; --muted:#6b7280; --accent1:#5b8cff; --accent2:#7b61ff; --danger:#ef4444; --warn:#f59e0b; --ok:#10b981;
+      :root {
+        --primary: #6366f1;
+        --primary-dark: #4f46e5;
+        --secondary: #ec4899;
+        --accent: #06b6d4;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --bg-dark: #0f172a;
+        --card-bg: rgba(30, 41, 59, 0.9);
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
       }
-      *{box-sizing:border-box}
-      body{font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif;background:linear-gradient(180deg,#eef2ff 0%, #f8fafc 60%);margin:0;color:#0f172a;min-height:100vh}
-      header{padding:28px 32px;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;display:flex;align-items:center;gap:16px}
-      .logo{width:46px;height:46px;border-radius:10px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
-      .title{font-size:20px;font-weight:700}
-      .subtitle{font-size:13px;opacity:0.95}
-      main{max-width:800px;margin:28px auto;padding:0 20px}
-      .card{background:var(--card);border-radius:12px;box-shadow:0 6px 18px rgba(15,23,42,0.06);padding:24px;margin-bottom:20px}
-      h2{margin:0 0 8px 0;color:#0f172a}
-      .muted{color:var(--muted);font-size:14px}
-      .topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:16px}
-      .topic-btn{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:10px;padding:14px;text-align:left;cursor:pointer;transition:all 0.2s;font-size:14px;color:#0369a1;font-weight:500}
-      .topic-btn:hover{background:linear-gradient(135deg,#e0f2fe,#bae6fd);transform:translateY(-2px);box-shadow:0 4px 12px rgba(14,165,233,0.15)}
-      .custom-topic{width:100%;padding:14px;border-radius:10px;border:1px solid #e6eef8;background:#fbfdff;font-size:14px;margin-top:12px}
-      .btn{background:linear-gradient(90deg,var(--accent1),var(--accent2));border:none;color:white;padding:12px 24px;border-radius:10px;font-weight:600;cursor:pointer;font-size:15px}
-      .btn:hover{opacity:0.9}
-      .chat-container{display:none;flex-direction:column;gap:16px;height:500px}
-      .chat-container.active{display:flex}
-      .messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:16px;background:#f8fafc;border-radius:12px}
-      .message{padding:14px 18px;border-radius:18px;max-width:80%;line-height:1.5}
-      .message.ai{background:linear-gradient(135deg,#e0f2fe,#f0f9ff);align-self:flex-start;border-bottom-left-radius:4px}
-      .message.user{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;align-self:flex-end;border-bottom-right-radius:4px}
-      .message.evaluation{background:#fffbeb;border-left:4px solid #f59e0b;align-self:center;max-width:90%;font-size:13px;color:#92400e;padding:12px 16px}
-      .input-area{display:flex;gap:12px}
-      .input-area input{flex:1;padding:14px;border-radius:12px;border:1px solid #e6eef8;background:#fbfdff;font-size:15px}
-      .input-area input:focus{outline:none;border-color:var(--accent1)}
-      .session-info{background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:16px;border-radius:12px;margin-bottom:16px;border:1px solid #bbf7d0}
-      .session-info h3{margin:0 0 8px 0;color:#166534;font-size:16px}
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#312e81 100%);margin:0;color:var(--text-primary);min-height:100vh;overflow-x:hidden}
+      
+      /* Animated background shapes */
+      .floating-shapes{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;overflow:hidden;pointer-events:none}
+      .shape{position:absolute;border-radius:50%;filter:blur(100px);opacity:0.4;animation:float 20s infinite ease-in-out}
+      .shape-1{width:500px;height:500px;background:#6366f1;top:-200px;right:-100px;animation-delay:0s}
+      .shape-2{width:400px;height:400px;background:#ec4899;bottom:-100px;left:-100px;animation-delay:-7s}
+      .shape-3{width:350px;height:350px;background:#06b6d4;top:40%;left:40%;animation-delay:-14s}
+      @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(50px,-50px) scale(1.1)}66%{transform:translate(-30px,30px) scale(0.9)}}
+      
+      header{padding:24px 40px;background:rgba(15,23,42,0.8);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+      .logo{width:50px;height:50px;border-radius:16px;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:28px;box-shadow:0 0 30px rgba(99,102,241,0.5);animation:pulse 2s infinite}
+      @keyframes pulse{0%,100%{box-shadow:0 0 20px rgba(99,102,241,0.4)}50%{box-shadow:0 0 40px rgba(99,102,241,0.7)}}
+      .title{font-size:26px;font-weight:800;background:linear-gradient(90deg,#6366f1,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .subtitle{font-size:13px;color:var(--text-secondary);font-weight:500}
+      .back-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;padding:12px 24px;border-radius:12px;cursor:pointer;font-weight:600;font-size:14px;transition:all 0.3s ease}
+      .back-btn:hover{background:rgba(255,255,255,0.2);transform:translateY(-2px);box-shadow:0 8px 25px rgba(99,102,241,0.3)}
+      .card{background:var(--card-bg);backdrop-filter:blur(20px);border-radius:24px;border:1px solid rgba(255,255,255,0.1);padding:40px;margin-bottom:24px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);transition:all 0.3s ease}
+      .card:hover{box-shadow:0 35px 60px -15px rgba(99,102,241,0.2)}
+      h2{margin:0 0 12px 0;font-size:32px;font-weight:800;background:linear-gradient(90deg,#6366f1,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .muted{color:var(--text-secondary);font-size:15px;line-height:1.7}
+      .topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:24px}
+      .topic-btn{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:20px;text-align:left;cursor:pointer;transition:all 0.3s ease;font-size:14px;color:var(--text-primary);font-weight:500}
+      .topic-btn:hover{background:rgba(99,102,241,0.2);border-color:rgba(99,102,241,0.5);transform:translateY(-4px);box-shadow:0 12px 30px rgba(99,102,241,0.3)}
+      .topic-btn.selected{background:linear-gradient(135deg,#6366f1,#ec4899);border-color:transparent;box-shadow:0 8px 30px rgba(99,102,241,0.5)}
+      .custom-topic{width:100%;padding:20px 24px;border-radius:16px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--text-primary);font-size:16px;margin-top:20px;transition:all 0.3s ease}
+      .custom-topic:focus{outline:none;border-color:#6366f1;box-shadow:0 0 20px rgba(99,102,241,0.3)}
+      .custom-topic::placeholder{color:var(--text-secondary)}
+      .btn{background:linear-gradient(135deg,#6366f1,#ec4899);border:none;color:white;padding:18px 36px;border-radius:16px;font-weight:700;cursor:pointer;font-size:16px;transition:all 0.3s ease;box-shadow:0 10px 30px rgba(99,102,241,0.4);position:relative;overflow:hidden}
+      .btn:hover{transform:translateY(-3px);box-shadow:0 15px 40px rgba(99,102,241,0.6)}
+      .btn:active{transform:translateY(-1px)}
+      .chat-container{display:none;flex-direction:column;gap:20px;height:600px}
+      .chat-container.active{display:flex;animation:fadeIn 0.5s ease}
+      @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+      .messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding:20px;background:rgba(15,23,42,0.6);border-radius:20px;border:1px solid rgba(255,255,255,0.05)}
+      .message{padding:16px 20px;border-radius:20px;max-width:85%;line-height:1.6;font-size:15px;animation:messagePop 0.3s ease}
+      @keyframes messagePop{from{opacity:0;transform:scale(0.9) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+      .message.ai{background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);align-self:flex-start;border-bottom-left-radius:6px;color:var(--text-primary)}
+      .message.user{background:linear-gradient(135deg,#6366f1,#ec4899);color:white;align-self:flex-end;border-bottom-right-radius:6px;box-shadow:0 4px 20px rgba(99,102,241,0.4)}
+      .message.evaluation{background:linear-gradient(135deg,rgba(245,158,11,0.15),rgba(239,68,68,0.15));border:1px solid rgba(245,158,11,0.4);align-self:center;max-width:90%;font-size:14px;color:#fbbf24;padding:14px 20px;border-radius:16px}
+      .input-area{display:flex;gap:12px;padding:8px;background:rgba(255,255,255,0.05);border-radius:20px;border:1px solid rgba(255,255,255,0.1)}
+      .input-area input{flex:1;padding:16px 20px;border-radius:16px;border:none;background:transparent;color:var(--text-primary);font-size:15px;outline:none}
+      .input-area input::placeholder{color:var(--text-secondary)}
+      .send-btn{background:linear-gradient(135deg,#6366f1,#ec4899);border:none;color:white;padding:16px 28px;border-radius:16px;font-weight:600;cursor:pointer;font-size:15px;transition:all 0.3s ease;box-shadow:0 4px 15px rgba(99,102,241,0.4)}
+      .send-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,0.5)}
+      .send-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+      .session-info{background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(6,182,212,0.15));backdrop-filter:blur(10px);padding:20px 24px;border-radius:20px;border:1px solid rgba(16,185,129,0.3);margin-bottom:16px}
+      .session-info h3{margin:0 0 8px 0;color:var(--success);font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+      .session-info p{margin:0;color:var(--text-primary);font-size:18px;font-weight:600}
+      .gamification-bar{display:none;background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(236,72,153,0.2));backdrop-filter:blur(10px);padding:16px 24px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);margin-bottom:16px}
+      .gamification-bar.active{display:block;animation:slideDown 0.5s ease}
+      @keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+      .stats-grid{display:flex;justify-content:space-around;flex-wrap:wrap;gap:16px}
+      .stat-item{display:flex;align-items:center;gap:12px;padding:8px 16px;background:rgba(255,255,255,0.05);border-radius:12px}
+      .stat-icon{font-size:24px}
+      .stat-label{font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+      .stat-value{font-size:18px;font-weight:700;color:var(--text-primary)}
       .gaps-section{display:none;margin-top:20px}
       .gaps-section.active{display:block}
-      .gap-item{background:#fef2f2;border:1px solid #fecaca;padding:12px;border-radius:8px;margin-bottom:8px;color:#991b1b;font-size:13px}
-      .back-btn{background:transparent;border:1px solid rgba(255,255,255,0.3);color:white;padding:8px 16px;border-radius:8px;cursor:pointer;margin-left:auto}
-      .back-btn:hover{background:rgba(255,255,255,0.1)}
-      .topic-display{font-size:18px;font-weight:600;margin-bottom:16px;color:var(--accent1)}
+      .gap-item{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:12px;border-radius:8px;margin-bottom:8px;color:#fca5a5;font-size:13px}
+      .topic-display{font-size:18px;font-weight:600;margin-bottom:16px;background:linear-gradient(90deg,#6366f1,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
       .start-screen{display:block}
       .start-screen.hidden{display:none}
-      .instructions{background:#f0f9ff;border:1px solid #bae6fd;padding:16px;border-radius:10px;margin-bottom:16px;color:#075985}
-      footer{max-width:800px;margin:18px auto;color:var(--muted);font-size:13px;padding:0 20px;text-align:center}
+      .instructions{background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);padding:16px;border-radius:10px;margin-bottom:16px;color:#818cf8}
+      footer{max-width:900px;margin:40px auto;color:var(--text-secondary);font-size:13px;padding:0 20px;text-align:center}
+      .hidden{display:none!important}
     </style>
   </head>
   <body>
+    <!-- Animated background shapes -->
+    <div class="floating-shapes">
+      <div class="shape shape-1"></div>
+      <div class="shape shape-2"></div>
+      <div class="shape shape-3"></div>
+    </div>
+
     <header>
       <div class="logo">📚</div>
       <div>
@@ -62,15 +108,15 @@
       <div id="startScreen" class="start-screen">
         <div class="card">
           <h2>What do you want to teach?</h2>
-          <p class="muted">Select a topic or enter your own. You'll explain it to an AI that asks questions like a curious student.</p>
+          <p class="muted">Select a topic or enter your own. You'll explain it to an AI student who asks questions to help you master the subject.</p>
           
           <div class="topic-grid" id="topicGrid"></div>
           
           <input type="text" id="customTopic" class="custom-topic" placeholder="Or type your own topic..." />
           
-          <div style="margin-top:16px">
+          <div style="margin-top:20px">
             <label class="muted">Your level:</label>
-            <select id="userLevel" style="padding:10px;border-radius:8px;border:1px solid #e6eef8;margin-left:10px">
+            <select id="userLevel" style="padding:12px 20px;border-radius:12px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--text-primary);margin-left:12px;font-size:14px">
               <option value="elementary">Elementary School</option>
               <option value="middle_school">Middle School</option>
               <option value="high_school" selected>High School</option>
@@ -78,64 +124,64 @@
             </select>
           </div>
           
-          <button class="btn" style="margin-top:20px" onclick="startSession()">Start Teaching →</button>
+          <button class="btn" style="margin-top:28px" onclick="startSession()">Start Teaching →</button>
         </div>
       </div>
 
       <div id="chatContainer" class="chat-container">
-        <div id="blurOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;flex-direction:column;color:white;text-align:center;padding:20px;">
-          <h2>⚠️ Tab Switching Detected</h2>
-          <p>Please return to this tab to continue your teaching session.</p>
-          <p id="tabSwitchWarning" style="color:#fbbf24;font-weight:bold;">Tab switches: 0/5</p>
-          <p style="font-size:14px;color:#9ca3af;margin-top:20px;">Switching tabs too many times will end your session.</p>
+        <div id="blurOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.9);backdrop-filter:blur(20px);z-index:1000;align-items:center;justify-content:center;flex-direction:column;color:white;text-align:center;padding:40px;">
+          <h2 style="font-size:36px;margin-bottom:16px;background:linear-gradient(90deg,#f59e0b,#ef4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">⚠️ Tab Switching Detected</h2>
+          <p style="font-size:18px;color:var(--text-secondary)">Please return to this tab to continue your teaching session.</p>
+          <p id="tabSwitchWarning" style="color:#fbbf24;font-weight:bold;margin-top:20px;font-size:20px">Tab switches: 0/5</p>
+          <p style="font-size:14px;color:var(--text-secondary);margin-top:24px">Switching tabs too many times will end your session.</p>
         </div>
         
         <!-- Gamification Stats Bar -->
-        <div class="gamification-bar" id="gamificationBar" style="display:none;background:linear-gradient(90deg,#fef3c7,#fde68a);padding:12px 16px;border-radius:12px;margin-bottom:12px;border:2px solid #f59e0b;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:20px;">⭐</span>
+        <div class="gamification-bar" id="gamificationBar">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-icon">⭐</span>
               <div>
-                <div style="font-size:12px;color:#92400e;font-weight:600;">LEVEL</div>
-                <div id="userLevel" style="font-size:14px;color:#78350f;font-weight:700;">Beginner</div>
+                <div class="stat-label">Level</div>
+                <div class="stat-value" id="userLevelDisplay">Beginner</div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:20px;">🔥</span>
+            <div class="stat-item">
+              <span class="stat-icon">🔥</span>
               <div>
-                <div style="font-size:12px;color:#92400e;font-weight:600;">STREAK</div>
-                <div id="userStreak" style="font-size:14px;color:#78350f;font-weight:700;">0</div>
+                <div class="stat-label">Streak</div>
+                <div class="stat-value" id="userStreak">0</div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:20px;">💎</span>
+            <div class="stat-item">
+              <span class="stat-icon">💎</span>
               <div>
-                <div style="font-size:12px;color:#92400e;font-weight:600;">POINTS</div>
-                <div id="userPoints" style="font-size:14px;color:#78350f;font-weight:700;">0</div>
+                <div class="stat-label">Points</div>
+                <div class="stat-value" id="userPoints">0</div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:20px;">🏆</span>
+            <div class="stat-item">
+              <span class="stat-icon">🏆</span>
               <div>
-                <div style="font-size:12px;color:#92400e;font-weight:600;">BADGES</div>
-                <div id="userBadges" style="font-size:14px;color:#78350f;font-weight:700;">0</div>
+                <div class="stat-label">Badges</div>
+                <div class="stat-value" id="userBadges">0</div>
               </div>
             </div>
           </div>
         </div>
         
         <div class="session-info">
-          <h3>🎓 Teaching Mode Active <span id="tabMonitor" style="font-size:12px;color:#f59e0b;margin-left:10px;">● Tab Monitoring ON</span></h3>
-          <p style="margin:0;color:#166534" id="sessionTopic"></p>
+          <h3>🎓 Teaching Mode Active</h3>
+          <p id="sessionTopic">Topic will appear here</p>
         </div>
         
-        <div class="topic-display" id="topicDisplay"></div>
-        
-        <div class="messages" id="messages"></div>
-        
-        <div class="input-area">
-          <input type="text" id="userInput" placeholder="Explain the concept to your AI student..." onkeypress="if(event.key==='Enter')sendMessage()" />
-          <button class="btn" onclick="sendMessage()">Send</button>
+        <div class="card" style="flex:1;display:flex;flex-direction:column;padding:20px;">
+          <div class="messages" id="messages"></div>
+          
+          <div class="input-area" style="margin-top:16px;">
+            <input type="text" id="userInput" placeholder="Explain the concept to your AI student..." onkeypress="if(event.key==='Enter')sendMessage()" />
+            <button class="send-btn" onclick="sendMessage()">Send</button>
+          </div>
         </div>
         
         <div class="gaps-section" id="gapsSection">
@@ -365,16 +411,18 @@
       function showStartScreen() {
         document.getElementById('startScreen').classList.remove('hidden')
         document.getElementById('chatContainer').classList.remove('active')
-        document.getElementById('gamificationBar').style.display = 'none'
+        document.getElementById('gamificationBar').classList.remove('active')
         currentSessionId = null
+        isSessionActive = false
         document.getElementById('customTopic').value = ''
+        document.querySelectorAll('.topic-btn').forEach(b => b.classList.remove('selected'))
       }
 
       function updateGamificationDisplay(gamification) {
         const bar = document.getElementById('gamificationBar')
-        bar.style.display = 'block'
+        bar.classList.add('active')
         
-        document.getElementById('userLevel').textContent = gamification.level
+        document.getElementById('userLevelDisplay').textContent = gamification.level
         document.getElementById('userStreak').textContent = gamification.current_streak
         document.getElementById('userPoints').textContent = gamification.total_points
         document.getElementById('userBadges').textContent = gamification.new_badges ? gamification.new_badges.length : '0'
