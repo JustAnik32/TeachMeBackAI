@@ -276,8 +276,7 @@
         }
 
         currentTopic = topic
-        document.getElementById('sessionTopic').textContent = `Teaching: ${topic} (${level.replace('_', ' ')})`
-        document.getElementById('topicDisplay').textContent = topic
+        document.getElementById('sessionTopic').textContent = topic
         tabSwitchCount = 0
         isSessionActive = true
 
@@ -298,12 +297,16 @@
             currentSessionId = data.session_id
             document.getElementById('startScreen').classList.add('hidden')
             document.getElementById('chatContainer').classList.add('active')
+            document.getElementById('gamificationBar').classList.add('active')
             
             const messages = document.getElementById('messages')
             messages.innerHTML = ''
             
             addMessage(data.message, 'ai')
             addMessage('📝 ' + data.instructions, 'ai')
+            
+            // Load user progress
+            loadUserProgress()
           } else {
             alert('Error: ' + (data.detail || 'Failed to start session'))
           }
