@@ -676,6 +676,11 @@
         arControls.maxDistance = 20
         arControls.maxPolarAngle = Math.PI / 2
         arControls.enablePan = true
+        arControls.mouseButtons = {
+          LEFT: null,  // Disable left click (use for drawing)
+          MIDDLE: THREE.MOUSE.DOLLY,  // Middle click to zoom
+          RIGHT: THREE.MOUSE.ROTATE   // Right click to rotate
+        }
 
         // Add lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
