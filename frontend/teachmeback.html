@@ -106,6 +106,14 @@
       .ar-instructions{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);padding:12px 24px;border-radius:20px;font-size:14px;color:white}
       .whiteboard-btn{background:linear-gradient(135deg,#06b6d4,#6366f1);border:none;color:white;padding:12px 20px;border-radius:12px;font-weight:600;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;transition:all 0.3s ease;margin-left:10px}
       .whiteboard-btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(6,182,212,0.4)}
+      
+      /* Typing Speed Tracker */
+      .typing-speed-widget{background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(6,182,212,0.15));backdrop-filter:blur(10px);padding:12px 20px;border-radius:16px;border:1px solid rgba(16,185,129,0.3);margin-bottom:16px;display:flex;justify-content:space-around;align-items:center;flex-wrap:wrap;gap:16px}
+      .speed-stat{text-align:center}
+      .speed-label{font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+      .speed-value{font-size:24px;font-weight:800;background:linear-gradient(90deg,#10b981,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .speed-unit{font-size:12px;color:var(--text-secondary)}
+      .typing-indicator{font-size:13px;color:var(--success);font-weight:500;animation:pulse 1s infinite}
     </style>
   </head>
   <body>
@@ -196,6 +204,26 @@
           <p id="sessionTopic">Topic will appear here</p>
         </div>
         
+        <!-- Typing Speed Tracker -->
+        <div class="typing-speed-widget" id="typingSpeedWidget">
+          <div class="speed-stat">
+            <div class="speed-label">Current WPM</div>
+            <div class="speed-value" id="currentWPM">0</div>
+            <div class="speed-unit">words/min</div>
+          </div>
+          <div class="speed-stat">
+            <div class="speed-label">Average WPM</div>
+            <div class="speed-value" id="avgWPM">0</div>
+            <div class="speed-unit">words/min</div>
+          </div>
+          <div class="speed-stat">
+            <div class="speed-label">Session Best</div>
+            <div class="speed-value" id="bestWPM">0</div>
+            <div class="speed-unit">words/min</div>
+          </div>
+          <div class="typing-indicator" id="typingIndicator" style="display:none">⚡ Typing...</div>
+        </div>
+        
         <div class="card" style="flex:1;display:flex;flex-direction:column;padding:20px;">
           <div class="messages" id="messages"></div>
           
@@ -251,6 +279,14 @@
       
       let currentSessionId = null
       let currentTopic = ''
+
+      // Typing Speed Tracker Variables
+      let typingStartTime = null
+      let typingCharCount = 0
+      let typingMeasurements = []
+      let bestWPM = 0
+      let isTyping = false
+      let typingTimeout = null
 
       const topics = [
         "Photosynthesis",
@@ -383,6 +419,22 @@
         const message = input.value.trim()
         
         if (!message || !currentSessionId) return
+        
+        // Calculate final typing speed for this message
+        if (typingStartTime && typingCharCount > 0) {
+          const duration = (Date.now() - typingStartTime) / 60000 // minutes
+          const words = message.split(/\s+/).length
+          const wpm = duration > 0 ? Math.round(words / duration) : 0
+          
+          if (wpm > 0) {
+            typingMeasurements.push(wpm)
+            if (wpm > bestWPM) bestWPM = wpm
+            updateTypingDisplay()
+          }
+        }
+        
+        // Reset typing tracker
+        resetTypingTracker()
         
         addMessage(message, 'user')
         input.value = ''
@@ -694,6 +746,74 @@
         // Show notification
         alert('✅ Whiteboard saved to chat! The AI can now see your diagram.')
       }
+
+      // ========== TYPING SPEED TRACKER FUNCTIONS ==========
+      function updateTypingDisplay() {
+        // Calculate average WPM
+        const avgWPM = typingMeasurements.length > 0 
+          ? Math.round(typingMeasurements.reduce((a, b) => a + b, 0) / typingMeasurements.length)
+          : 0
+        
+        // Update display
+        document.getElementById('avgWPM').textContent = avgWPM
+        document.getElementById('bestWPM').textContent = bestWPM
+      }
+
+      function resetTypingTracker() {
+        typingStartTime = null
+        typingCharCount = 0
+        isTyping = false
+        clearTimeout(typingTimeout)
+        document.getElementById('typingIndicator').style.display = 'none'
+        document.getElementById('currentWPM').textContent = '0'
+      }
+
+      function trackTypingSpeed() {
+        const input = document.getElementById('userInput')
+        const text = input.value
+        
+        // Start timer on first keystroke
+        if (!typingStartTime && text.length > 0) {
+          typingStartTime = Date.now()
+        }
+        
+        // Update character count
+        typingCharCount = text.length
+        
+        // Show typing indicator
+        if (text.length > 0) {
+          document.getElementById('typingIndicator').style.display = 'block'
+          isTyping = true
+          
+          // Clear previous timeout
+          clearTimeout(typingTimeout)
+          
+          // Hide indicator after 1 second of no typing
+          typingTimeout = setTimeout(() => {
+            document.getElementById('typingIndicator').style.display = 'none'
+            isTyping = false
+          }, 1000)
+          
+          // Calculate current WPM in real-time
+          if (typingStartTime) {
+            const duration = (Date.now() - typingStartTime) / 60000 // minutes
+            const words = text.split(/\s+/).filter(w => w.length > 0).length
+            const currentWPM = duration > 0 ? Math.round(words / duration) : 0
+            document.getElementById('currentWPM').textContent = currentWPM
+          }
+        } else {
+          document.getElementById('typingIndicator').style.display = 'none'
+          document.getElementById('currentWPM').textContent = '0'
+        }
+      }
+
+      // Add event listener for typing
+      document.addEventListener('DOMContentLoaded', function() {
+        const userInput = document.getElementById('userInput')
+        if (userInput) {
+          userInput.addEventListener('input', trackTypingSpeed)
+        }
+      })
 
       init()
     </script>
