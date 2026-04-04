@@ -485,6 +485,36 @@ Keep responses conversational and at {session['user_level']} level."""
         session['messages'].append({'role': 'assistant', 'content': ai_response})
         data_store.update_teachmeback_session(payload.session_id, session)
 
+        # --- GAMIFICATION LOGIC ---
+        user_id = 'anonymous'  # Can be updated with actual user auth later
+        
+        # Determine if answer is correct (based on AI evaluation)
+        is_correct = correctness == 'CORRECT'
+        
+        # Update streak
+        streak_result = data_store.update_streak(user_id, is_correct)
+        
+        # Calculate points
+        points_earned = 0
+        if is_correct:
+            points_earned = 10  # Base points for correct answer
+            # Streak bonus
+            if streak_result['current_streak'] >= 3:
+                points_earned += 5  # Bonus for 3+ streak
+            if streak_result['current_streak'] >= 5:
+                points_earned += 10  # Bigger bonus for 5+ streak
+        else:
+            points_earned = 2  # Participation points for trying
+        
+        # Add points
+        points_result = data_store.add_points(user_id, points_earned)
+        
+        # Check for new badges
+        new_badges = data_store.check_and_award_badges(user_id, session)
+        
+        # Get updated progress
+        user_progress = data_store.get_user_progress(user_id)
+
         return {
             'session_id': payload.session_id,
             'message': ai_response,
@@ -492,6 +522,16 @@ Keep responses conversational and at {session['user_level']} level."""
                 'correctness': correctness,
                 'feedback': feedback,
                 'missing_concepts': missing_concepts
+            },
+            'gamification': {
+                'points_earned': points_earned,
+                'total_points': points_result['new_total'],
+                'current_streak': streak_result['current_streak'],
+                'max_streak': streak_result['max_streak'],
+                'level': points_result['level'],
+                'level_up': points_result['level_up'],
+                'new_badges': new_badges,
+                'accuracy': round((user_progress['correct_answers'] / user_progress['total_answers'] * 100), 1) if user_progress['total_answers'] > 0 else 0
             }
         }
 
@@ -551,3 +591,25 @@ def get_topic_suggestions():
             "Chemical Bonds"
         ]
     }
+
+
+@app.get('/api/teachmeback/progress')
+def get_user_progress_endpoint(user_id: str = 'anonymous'):
+    """Get user's gamification progress (points, badges, level, streaks)"""
+    try:
+        progress = data_store.get_user_progress(user_id)
+        return {
+            'user_id': user_id,
+            'points': progress['points'],
+            'total_points_earned': progress['total_points_earned'],
+            'level': progress['level'],
+            'current_streak': progress['current_streak'],
+            'max_streak': progress['max_streak'],
+            'badges': progress['badges'],
+            'topics_mastered': progress['topics_mastered'],
+            'correct_answers': progress['correct_answers'],
+            'total_answers': progress['total_answers'],
+            'accuracy': round((progress['correct_answers'] / progress['total_answers'] * 100), 1) if progress['total_answers'] > 0 else 0
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching progress: {str(e)}")

@@ -204,3 +204,171 @@ def get_teachmeback_session(session_id: str):
     with open(path, 'r', encoding='utf-8') as f:
         sessions = json.load(f)
     return sessions.get(session_id)
+
+
+# --------- Gamification: User Progress Tracking ---------
+def _user_progress_path():
+    return os.path.join(_data_dir(), 'user_progress.json')
+
+
+def get_user_progress(user_id: str = 'anonymous'):
+    """Get or create user progress data with points, streaks, badges, and level"""
+    path = _user_progress_path()
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            all_progress = json.load(f)
+    else:
+        all_progress = {}
+    
+    if user_id not in all_progress:
+        all_progress[user_id] = {
+            'points': 0,
+            'total_points_earned': 0,
+            'current_streak': 0,
+            'max_streak': 0,
+            'level': 'Beginner',
+            'badges': [],
+            'topics_mastered': [],
+            'correct_answers': 0,
+            'total_answers': 0,
+            'last_session_date': None,
+            'created_at': datetime.utcnow().isoformat()
+        }
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(all_progress, f, indent=2)
+    
+    return all_progress[user_id]
+
+
+def update_user_progress(user_id: str, updates: dict):
+    """Update user progress with new data"""
+    path = _user_progress_path()
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            all_progress = json.load(f)
+    else:
+        all_progress = {}
+    
+    if user_id not in all_progress:
+        all_progress[user_id] = get_user_progress(user_id)
+    
+    all_progress[user_id].update(updates)
+    all_progress[user_id]['last_updated'] = datetime.utcnow().isoformat()
+    
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(all_progress, f, indent=2)
+    return all_progress[user_id]
+
+
+def add_points(user_id: str, points: int, reason: str = ''):
+    """Add points to user and check for level up"""
+    progress = get_user_progress(user_id)
+    progress['points'] += points
+    progress['total_points_earned'] += points
+    
+    # Level up logic
+    levels = [
+        ('Beginner', 0),
+        ('Learner', 50),
+        ('Student', 150),
+        ('Scholar', 300),
+        ('Teacher', 500),
+        ('Master Teacher', 1000),
+        ('Expert', 2000)
+    ]
+    
+    new_level = 'Beginner'
+    for level_name, min_points in levels:
+        if progress['points'] >= min_points:
+            new_level = level_name
+    
+    level_up = new_level != progress['level']
+    progress['level'] = new_level
+    
+    update_user_progress(user_id, progress)
+    return {'points_added': points, 'new_total': progress['points'], 'level': new_level, 'level_up': level_up}
+
+
+def update_streak(user_id: str, is_correct: bool):
+    """Update user's streak based on answer correctness"""
+    progress = get_user_progress(user_id)
+    
+    if is_correct:
+        progress['current_streak'] += 1
+        if progress['current_streak'] > progress['max_streak']:
+            progress['max_streak'] = progress['current_streak']
+    else:
+        progress['current_streak'] = 0
+    
+    progress['total_answers'] += 1
+    if is_correct:
+        progress['correct_answers'] += 1
+    
+    update_user_progress(user_id, progress)
+    return {'current_streak': progress['current_streak'], 'max_streak': progress['max_streak']}
+
+
+def award_badge(user_id: str, badge_id: str, badge_name: str, badge_description: str):
+    """Award a badge to user if not already earned"""
+    progress = get_user_progress(user_id)
+    
+    # Check if badge already exists
+    existing_badges = [b['id'] for b in progress['badges']]
+    if badge_id in existing_badges:
+        return {'new_badge': False, 'badge': None}
+    
+    new_badge = {
+        'id': badge_id,
+        'name': badge_name,
+        'description': badge_description,
+        'awarded_at': datetime.utcnow().isoformat()
+    }
+    
+    progress['badges'].append(new_badge)
+    update_user_progress(user_id, progress)
+    return {'new_badge': True, 'badge': new_badge}
+
+
+def check_and_award_badges(user_id: str, session_data: dict = None):
+    """Check all badge conditions and award new badges"""
+    progress = get_user_progress(user_id)
+    new_badges = []
+    
+    # Badge definitions with conditions
+    badge_conditions = [
+        ('first_explanation', 'First Steps', 'Completed your first teaching session', lambda p: p['total_answers'] >= 1),
+        ('correct_streak_3', 'On Fire!', '3 correct answers in a row', lambda p: p['current_streak'] >= 3),
+        ('correct_streak_5', 'Unstoppable!', '5 correct answers in a row', lambda p: p['current_streak'] >= 5),
+        ('correct_streak_10', 'Legendary!', '10 correct answers in a row', lambda p: p['current_streak'] >= 10),
+        ('points_50', 'Point Collector', 'Earned 50 points', lambda p: p['points'] >= 50),
+        ('points_100', 'Century Club', 'Earned 100 points', lambda p: p['points'] >= 100),
+        ('points_500', 'High Achiever', 'Earned 500 points', lambda p: p['points'] >= 500),
+        ('master_teacher', 'Master Teacher', 'Reached Master Teacher level', lambda p: p['level'] == 'Master Teacher'),
+        ('expert', 'Expert Educator', 'Reached Expert level', lambda p: p['level'] == 'Expert'),
+    ]
+    
+    for badge_id, badge_name, description, condition in badge_conditions:
+        if condition(progress):
+            result = award_badge(user_id, badge_id, badge_name, description)
+            if result['new_badge']:
+                new_badges.append(result['badge'])
+    
+    return new_badges
+
+
+def mark_topic_mastered(user_id: str, topic: str, score: int):
+    """Mark a topic as mastered and award points"""
+    progress = get_user_progress(user_id)
+    
+    # Check if topic already mastered
+    existing = [t for t in progress['topics_mastered'] if t['topic'] == topic]
+    if not existing:
+        progress['topics_mastered'].append({
+            'topic': topic,
+            'mastered_at': datetime.utcnow().isoformat(),
+            'final_score': score
+        })
+        update_user_progress(user_id, progress)
+        return {'new_mastered': True, 'bonus_points': 20}
+    
+    return {'new_mastered': False, 'bonus_points': 0}

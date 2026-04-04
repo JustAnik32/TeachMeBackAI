@@ -90,6 +90,40 @@
           <p style="font-size:14px;color:#9ca3af;margin-top:20px;">Switching tabs too many times will end your session.</p>
         </div>
         
+        <!-- Gamification Stats Bar -->
+        <div class="gamification-bar" id="gamificationBar" style="display:none;background:linear-gradient(90deg,#fef3c7,#fde68a);padding:12px 16px;border-radius:12px;margin-bottom:12px;border:2px solid #f59e0b;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:20px;">⭐</span>
+              <div>
+                <div style="font-size:12px;color:#92400e;font-weight:600;">LEVEL</div>
+                <div id="userLevel" style="font-size:14px;color:#78350f;font-weight:700;">Beginner</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:20px;">🔥</span>
+              <div>
+                <div style="font-size:12px;color:#92400e;font-weight:600;">STREAK</div>
+                <div id="userStreak" style="font-size:14px;color:#78350f;font-weight:700;">0</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:20px;">💎</span>
+              <div>
+                <div style="font-size:12px;color:#92400e;font-weight:600;">POINTS</div>
+                <div id="userPoints" style="font-size:14px;color:#78350f;font-weight:700;">0</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:20px;">🏆</span>
+              <div>
+                <div style="font-size:12px;color:#92400e;font-weight:600;">BADGES</div>
+                <div id="userBadges" style="font-size:14px;color:#78350f;font-weight:700;">0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
         <div class="session-info">
           <h3>🎓 Teaching Mode Active <span id="tabMonitor" style="font-size:12px;color:#f59e0b;margin-left:10px;">● Tab Monitoring ON</span></h3>
           <p style="margin:0;color:#166534" id="sessionTopic"></p>
@@ -281,6 +315,27 @@
               
               addMessage(evalMessage, 'evaluation')
             }
+            
+            // Show gamification updates
+            if (data.gamification) {
+              updateGamificationDisplay(data.gamification)
+              
+              // Show level up notification
+              if (data.gamification.level_up) {
+                setTimeout(() => {
+                  alert(`🎉 LEVEL UP! You're now a ${data.gamification.level}! Keep up the great work!`)
+                }, 500)
+              }
+              
+              // Show new badges notification
+              if (data.gamification.new_badges && data.gamification.new_badges.length > 0) {
+                data.gamification.new_badges.forEach(badge => {
+                  setTimeout(() => {
+                    alert(`🏆 NEW BADGE UNLOCKED: ${badge.name}!\n${badge.description}`)
+                  }, 1000)
+                })
+              }
+            }
           } else {
             addMessage('Error: ' + (data.detail || 'Failed to get response'), 'ai')
           }
@@ -292,8 +347,36 @@
       function showStartScreen() {
         document.getElementById('startScreen').classList.remove('hidden')
         document.getElementById('chatContainer').classList.remove('active')
+        document.getElementById('gamificationBar').style.display = 'none'
         currentSessionId = null
         document.getElementById('customTopic').value = ''
+      }
+
+      function updateGamificationDisplay(gamification) {
+        const bar = document.getElementById('gamificationBar')
+        bar.style.display = 'block'
+        
+        document.getElementById('userLevel').textContent = gamification.level
+        document.getElementById('userStreak').textContent = gamification.current_streak
+        document.getElementById('userPoints').textContent = gamification.total_points
+        document.getElementById('userBadges').textContent = gamification.new_badges ? gamification.new_badges.length : '0'
+      }
+
+      async function loadUserProgress() {
+        try {
+          const res = await fetch(API + '/teachmeback/progress')
+          if (res.ok) {
+            const data = await res.json()
+            updateGamificationDisplay({
+              level: data.level,
+              current_streak: data.current_streak,
+              total_points: data.points,
+              new_badges: data.badges
+            })
+          }
+        } catch (e) {
+          console.error('Failed to load progress:', e)
+        }
       }
 
       init()
