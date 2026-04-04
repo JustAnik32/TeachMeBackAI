@@ -107,6 +107,20 @@
       .whiteboard-btn{background:linear-gradient(135deg,#06b6d4,#6366f1);border:none;color:white;padding:12px 20px;border-radius:12px;font-weight:600;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;transition:all 0.3s ease;margin-left:10px}
       .whiteboard-btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(6,182,212,0.4)}
       
+      /* Voice Input Button */
+      .voice-btn{background:linear-gradient(135deg,#ef4444,#ec4899);border:none;color:white;padding:12px 20px;border-radius:12px;font-weight:600;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;transition:all 0.3s ease;margin-left:10px;position:relative;overflow:hidden}
+      .voice-btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(239,68,68,0.4)}
+      .voice-btn.recording{animation:pulse-red 1s infinite;background:linear-gradient(135deg,#dc2626,#991b1b)}
+      @keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.7)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+      .voice-btn::before{content:'';position:absolute;top:50%;left:50%;width:0;height:0;background:rgba(255,255,255,0.3);border-radius:50%;transform:translate(-50%,-50%);transition:width 0.3s,height 0.3s}
+      .voice-btn:active::before{width:100px;height:100px}
+      
+      /* Voice Status */
+      .voice-status{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#ef4444,#ec4899);color:white;padding:16px 32px;border-radius:20px;font-size:16px;font-weight:600;box-shadow:0 10px 40px rgba(239,68,68,0.4);z-index:1000;display:none;animation:slideUp 0.3s ease}
+      .voice-status.active{display:block}
+      .voice-status .listening{animation:pulse 1s infinite}
+      @keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+      
       /* Typing Speed Tracker */
       .typing-speed-widget{background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(6,182,212,0.15));backdrop-filter:blur(10px);padding:12px 20px;border-radius:16px;border:1px solid rgba(16,185,129,0.3);margin-bottom:16px;display:flex;justify-content:space-around;align-items:center;flex-wrap:wrap;gap:16px}
       .speed-stat{text-align:center}
@@ -230,6 +244,7 @@
           <div class="input-area" style="margin-top:16px;">
             <input type="text" id="userInput" placeholder="Explain the concept to your AI student..." onkeypress="if(event.key==='Enter')sendMessage()" />
             <button class="whiteboard-btn" onclick="openWhiteboard()" title="Open 3D Whiteboard">🎨</button>
+            <button class="voice-btn" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input">🎤</button>
             <button class="send-btn" onclick="sendMessage()">Send</button>
           </div>
         </div>
@@ -240,6 +255,11 @@
         </div>
       </div>
     </main>
+
+    <!-- Voice Input Status -->
+    <div id="voiceStatus" class="voice-status">
+      <span class="listening">🎤 Listening...</span> Speak now!
+    </div>
 
     <!-- AR Whiteboard Container -->
     <div id="arWhiteboard" class="ar-whiteboard-container">
@@ -745,6 +765,104 @@
         
         // Show notification
         alert('✅ Whiteboard saved to chat! The AI can now see your diagram.')
+      }
+
+      // ========== VOICE INPUT ==========
+      let recognition = null
+      let isRecording = false
+
+      function initVoiceRecognition() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+          recognition = new SpeechRecognition()
+          recognition.continuous = true
+          recognition.interimResults = true
+          recognition.lang = 'en-US'
+          
+          recognition.onstart = function() {
+            isRecording = true
+            document.getElementById('voiceBtn').classList.add('recording')
+            document.getElementById('voiceStatus').classList.add('active')
+          }
+          
+          recognition.onend = function() {
+            isRecording = false
+            document.getElementById('voiceBtn').classList.remove('recording')
+            document.getElementById('voiceStatus').classList.remove('active')
+          }
+          
+          recognition.onresult = function(event) {
+            const input = document.getElementById('userInput')
+            let finalTranscript = ''
+            let interimTranscript = ''
+            
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              const transcript = event.results[i][0].transcript
+              if (event.results[i].isFinal) {
+                finalTranscript += transcript + ' '
+              } else {
+                interimTranscript += transcript
+              }
+            }
+            
+            // Append to existing text
+            if (finalTranscript) {
+              input.value = (input.value + ' ' + finalTranscript).trim()
+              trackTypingSpeed() // Update typing speed tracker
+            }
+            
+            // Show interim results
+            if (interimTranscript && !finalTranscript) {
+              input.placeholder = 'Listening: ' + interimTranscript
+            } else {
+              input.placeholder = 'Explain the concept to your AI student...'
+            }
+          }
+          
+          recognition.onerror = function(event) {
+            console.error('Speech recognition error:', event.error)
+            if (event.error === 'not-allowed') {
+              alert('Microphone access denied. Please allow microphone access to use voice input.')
+            }
+            stopVoiceRecording()
+          }
+          
+          return true
+        } else {
+          alert('Voice input is not supported in your browser. Please use Chrome, Edge, or Safari.')
+          return false
+        }
+      }
+
+      function toggleVoiceInput() {
+        if (!recognition) {
+          if (!initVoiceRecognition()) return
+        }
+        
+        if (isRecording) {
+          stopVoiceRecording()
+        } else {
+          startVoiceRecording()
+        }
+      }
+
+      function startVoiceRecording() {
+        try {
+          recognition.start()
+        } catch (e) {
+          console.error('Failed to start voice recording:', e)
+        }
+      }
+
+      function stopVoiceRecording() {
+        try {
+          recognition.stop()
+        } catch (e) {
+          console.error('Failed to stop voice recording:', e)
+        }
+        document.getElementById('voiceStatus').classList.remove('active')
+        document.getElementById('voiceBtn').classList.remove('recording')
+        document.getElementById('userInput').placeholder = 'Explain the concept to your AI student...'
       }
 
       // ========== TYPING SPEED TRACKER FUNCTIONS ==========
