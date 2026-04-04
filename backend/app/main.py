@@ -90,6 +90,35 @@ def check_plagiarism(user_response: str, ai_messages: list) -> dict:
     
     return {"is_copied": False, "confidence": max_similarity, "reason": "OK"}
 
+
+def check_inappropriate_content(user_message: str) -> dict:
+    """Check for insults, abuse, or inappropriate content"""
+    import re
+    
+    message_lower = user_message.lower()
+    
+    # List of insults/abusive words to detect
+    insults = [
+        'loser', 'stupid', 'idiot', 'dumb', 'moron', 'hate you', 'shut up', 
+        'useless', 'worthless', 'kill yourself', 'kys', 'die', 'hate', 'worst',
+        'terrible', 'suck', 'garbage', 'trash', 'ugly', 'fat', 'annoying'
+    ]
+    
+    detected = []
+    for word in insults:
+        if word in message_lower:
+            detected.append(word)
+    
+    if detected:
+        return {
+            "is_inappropriate": True,
+            "detected_words": detected,
+            "severity": "high" if len(detected) >= 2 else "medium"
+        }
+    
+    return {"is_inappropriate": False, "detected_words": [], "severity": "none"}
+
+
 from . import utils, data_store
 
 class CaseIn(BaseModel):
@@ -368,6 +397,28 @@ def chat_teachmeback(payload: TeachMeBackMessageIn):
             'message': f"⚠️ {plagiarism_result['reason']}\n\nTry explaining in your own words based on what you know!",
             'is_copied': True
         }
+
+    # Check for inappropriate content (insults, abuse)
+    content_check = check_inappropriate_content(payload.message)
+    if content_check['is_inappropriate']:
+        warning_message = "🛑 Let's keep our learning environment respectful. I'm here to help you learn! \n\n"
+        
+        if content_check['severity'] == 'high':
+            warning_message += "If you'd like to continue learning, please let me know what topic you'd like to explore. Otherwise, we can end this session."
+            return {
+                'session_id': payload.session_id,
+                'message': warning_message,
+                'inappropriate_detected': True,
+                'warning_count': 1
+            }
+        else:
+            warning_message += "I understand learning can be frustrating sometimes. Let's get back to our topic. What would you like to know about " + session['topic'] + "?"
+            return {
+                'session_id': payload.session_id,
+                'message': warning_message,
+                'inappropriate_detected': True,
+                'warning_count': 1
+            }
 
     try:
         # First, evaluate the user's answer for correctness
