@@ -837,8 +837,14 @@
         // Close whiteboard
         closeWhiteboard()
         
+        // Prompt user to explain their diagram and auto-fill input
+        const diagramPrompt = "I created a diagram on the whiteboard showing " + currentTopic + ". Let me explain what I drew: "
+        const userInput = document.getElementById('userInput')
+        userInput.value = diagramPrompt
+        userInput.focus()
+        
         // Show notification
-        alert('✅ Whiteboard saved to chat! The AI can now see your diagram.')
+        alert('✅ Whiteboard saved! Now explain your diagram to the AI.')
       }
 
       // ========== VOICE INPUT ==========
