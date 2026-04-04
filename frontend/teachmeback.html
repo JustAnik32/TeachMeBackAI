@@ -220,11 +220,9 @@
       </div>
 
       <div id="chatContainer" class="chat-container">
-        <div id="blurOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.9);backdrop-filter:blur(20px);z-index:1000;align-items:center;justify-content:center;flex-direction:column;color:white;text-align:center;padding:40px;">
-          <h2 style="font-size:36px;margin-bottom:16px;background:linear-gradient(90deg,#f59e0b,#ef4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">⚠️ Tab Switching Detected</h2>
-          <p style="font-size:18px;color:var(--text-secondary)">Please return to this tab to continue your teaching session.</p>
-          <p id="tabSwitchWarning" style="color:#fbbf24;font-weight:bold;margin-top:20px;font-size:20px">Tab switches: 0/5</p>
-          <p style="font-size:14px;color:var(--text-secondary);margin-top:24px">Switching tabs too many times will end your session.</p>
+        <div class="session-info">
+          <h3>🎓 Teaching Mode Active</h3>
+          <p id="sessionTopic">Topic will appear here</p>
         </div>
         
         <!-- Gamification Stats Bar -->
@@ -284,11 +282,6 @@
           </div>
         </div>
         
-        <div class="session-info">
-          <h3>🎓 Teaching Mode Active</h3>
-          <p id="sessionTopic">Topic will appear here</p>
-        </div>
-        
         <!-- Typing Speed Tracker -->
         <div class="typing-speed-widget" id="typingSpeedWidget">
           <div class="speed-stat">
@@ -326,11 +319,6 @@
         </div>
       </div>
     </main>
-
-    <!-- Voice Input Status -->
-    <div id="voiceStatus" class="voice-status">
-      <span class="listening">🎤 Listening...</span> Speak now!
-    </div>
 
     <!-- AR Whiteboard Container -->
     <div id="arWhiteboard" class="ar-whiteboard-container">
@@ -405,40 +393,7 @@
         })
       }
 
-      let tabSwitchCount = 0
       let isSessionActive = false
-
-      // Tab switching detection
-      document.addEventListener('visibilitychange', function() {
-        const blurOverlay = document.getElementById('blurOverlay')
-        const tabWarning = document.getElementById('tabSwitchWarning')
-        
-        if (document.hidden && isSessionActive) {
-          tabSwitchCount++
-          blurOverlay.style.display = 'flex'
-          if (tabWarning) tabWarning.textContent = `Tab switches: ${tabSwitchCount}/5`
-          
-          if (tabSwitchCount >= 2) {
-            alert('⚠️ Warning: You have switched tabs. Please stay on this page during your teaching session.')
-          }
-          
-          if (tabSwitchCount >= 5) {
-            alert('❌ Session ended due to excessive tab switching.')
-            showStartScreen()
-            isSessionActive = false
-            tabSwitchCount = 0
-          }
-        } else if (!document.hidden && isSessionActive) {
-          blurOverlay.style.display = 'none'
-        }
-      })
-
-      // Also detect when window loses focus
-      window.addEventListener('blur', function() {
-        if (isSessionActive) {
-          console.log('Window lost focus')
-        }
-      })
 
       async function startSession() {
         const topic = document.getElementById('customTopic').value.trim()
@@ -452,7 +407,6 @@
 
         currentTopic = topic
         document.getElementById('sessionTopic').textContent = topic
-        tabSwitchCount = 0
         isSessionActive = true
 
         // Show loading state
