@@ -503,8 +503,7 @@ Keep responses conversational and at {session['user_level']} level."""
                 points_earned += 5  # Bonus for 3+ streak
             if streak_result['current_streak'] >= 5:
                 points_earned += 10  # Bigger bonus for 5+ streak
-        else:
-            points_earned = 2  # Participation points for trying
+        # No points for incorrect answers
         
         # Add points
         points_result = data_store.add_points(user_id, points_earned)
