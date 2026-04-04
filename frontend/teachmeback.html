@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>TeachMeBack — Learn by Teaching</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
       :root {
@@ -598,6 +599,7 @@
 
       // ========== AR WHITEBOARD ==========
       let arScene, arCamera, arRenderer, arCanvas, arContext, arTexture, arMaterial, arMesh
+      let arControls = null
       let isDrawing = false
       let drawColor = '#ffffff'
       let lastX = 0, lastY = 0
@@ -666,6 +668,15 @@
         arCamera.position.y = 2
         arCamera.lookAt(0, 0, 0)
 
+        // Add orbit controls for 360-degree rotation
+        arControls = new THREE.OrbitControls(arCamera, arRenderer.domElement)
+        arControls.enableDamping = true
+        arControls.dampingFactor = 0.05
+        arControls.minDistance = 3
+        arControls.maxDistance = 20
+        arControls.maxPolarAngle = Math.PI / 2
+        arControls.enablePan = true
+
         // Add lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
         arScene.add(ambientLight)
@@ -699,7 +710,10 @@
         if (!document.getElementById('arWhiteboard').classList.contains('active')) return
         requestAnimationFrame(animateAR)
         
-        // Render scene (no rotation - board stays still)
+        // Update orbit controls
+        if (arControls) arControls.update()
+        
+        // Render scene
         arRenderer.render(arScene, arCamera)
       }
 
