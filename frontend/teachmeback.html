@@ -730,6 +730,9 @@
       }
 
       function startDrawing(e) {
+        if (e.button !== 0) return  // Only left click
+        e.preventDefault()
+        e.stopPropagation()
         isDrawing = true
         const coords = getARCoordinates(e)
         lastX = coords.x
@@ -739,6 +742,7 @@
 
       function draw(e) {
         if (!isDrawing) return
+        e.preventDefault()
         
         const coords = getARCoordinates(e)
         
