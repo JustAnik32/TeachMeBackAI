@@ -222,6 +222,7 @@
       async function startSession() {
         const topic = document.getElementById('customTopic').value.trim()
         const level = document.getElementById('userLevel').value
+        const startBtn = document.querySelector('.btn[onclick="startSession()"]')
         
         if (!topic) {
           alert('Please select or enter a topic')
@@ -233,6 +234,10 @@
         document.getElementById('topicDisplay').textContent = topic
         tabSwitchCount = 0
         isSessionActive = true
+
+        // Show loading state
+        startBtn.textContent = 'Loading AI Student...'
+        startBtn.disabled = true
 
         try {
           const res = await fetch(API + '/teachmeback/start', {
@@ -259,6 +264,10 @@
         } catch (e) {
           alert('Cannot connect to server. Make sure the backend is running on port 8000.')
           console.error(e)
+        } finally {
+          // Reset button
+          startBtn.textContent = 'Start Teaching'
+          startBtn.disabled = false
         }
       }
 
@@ -273,12 +282,17 @@
 
       async function sendMessage() {
         const input = document.getElementById('userInput')
+        const sendBtn = document.querySelector('.btn[onclick="sendMessage()"]')
         const message = input.value.trim()
         
         if (!message || !currentSessionId) return
         
         addMessage(message, 'user')
         input.value = ''
+        
+        // Show loading state
+        sendBtn.textContent = '...'
+        sendBtn.disabled = true
         
         try {
           const res = await fetch(API + '/teachmeback/chat', {
@@ -341,6 +355,10 @@
           }
         } catch (e) {
           addMessage('Connection error', 'ai')
+        } finally {
+          // Reset button
+          sendBtn.textContent = 'Send'
+          sendBtn.disabled = false
         }
       }
 
