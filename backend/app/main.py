@@ -612,3 +612,73 @@ def get_user_progress_endpoint(user_id: str = 'anonymous'):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching progress: {str(e)}")
+
+
+@app.get('/api/teachmeback/knowledge-graph/{session_id}')
+def get_knowledge_graph(session_id: str):
+    """Get knowledge graph for a session"""
+    graph = data_store.get_session_knowledge_graph(session_id)
+    return graph
+
+
+@app.post('/api/teachmeback/knowledge-graph/{session_id}/extract')
+def extract_concepts(session_id: str, payload: dict):
+    """Extract concepts and relationships from user message"""
+    session = data_store.get_teachmeback_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    message = payload.get('message', '')
+    topic = session['topic']
+    
+    try:
+        # Use AI to extract concepts and relationships
+        extraction_prompt = f"""You are analyzing a teaching session about "{topic}".
+
+The student said: "{message}"
+
+Extract key concepts mentioned and their relationships. Respond in this exact JSON format:
+{{
+  "concepts": [
+    {{"id": "concept_id", "name": "Concept Name", "description": "Brief description"}},
+    ...
+  ],
+  "relationships": [
+    {{"source": "concept_id", "target": "concept_id", "type": "relationship_type"}},
+    ...
+  ]
+}}
+
+Relationship types can be: "is_a", "part_of", "causes", "requires", "leads_to", "example_of", "related_to"
+Only include concepts actually mentioned in the message. Use lowercase snake_case for IDs."""
+
+        response = call_openrouter(extraction_prompt, f"Extract concepts from: {message}", max_tokens=400)
+        
+        # Parse JSON from response
+        import json
+        try:
+            # Find JSON in response
+            start = response.find('{')
+            end = response.rfind('}') + 1
+            if start >= 0 and end > start:
+                data = json.loads(response[start:end])
+                concepts = data.get('concepts', [])
+                relationships = data.get('relationships', [])
+            else:
+                concepts = []
+                relationships = []
+        except:
+            concepts = []
+            relationships = []
+        
+        # Update knowledge graph
+        graph = data_store.update_knowledge_graph(session_id, concepts, relationships)
+        
+        return {
+            'concepts_added': len(concepts),
+            'relationships_added': len(relationships),
+            'graph': graph
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error extracting concepts: {str(e)}")

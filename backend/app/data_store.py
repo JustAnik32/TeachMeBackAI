@@ -372,3 +372,95 @@ def mark_topic_mastered(user_id: str, topic: str, score: int):
         return {'new_mastered': True, 'bonus_points': 20}
     
     return {'new_mastered': False, 'bonus_points': 0}
+
+
+# ========== KNOWLEDGE GRAPH FUNCTIONS ==========
+
+def _knowledge_graph_path():
+    return os.path.join(_data_dir(), 'knowledge_graphs.json')
+
+def get_session_knowledge_graph(session_id: str):
+    """Get or create knowledge graph for a session"""
+    path = _knowledge_graph_path()
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            graphs = json.load(f)
+    else:
+        graphs = {}
+    
+    if session_id not in graphs:
+        graphs[session_id] = {
+            'concepts': [],
+            'relationships': [],
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(graphs, f, indent=2)
+    
+    return graphs[session_id]
+
+def update_knowledge_graph(session_id: str, concepts: list, relationships: list):
+    """Update knowledge graph with new concepts and relationships"""
+    path = _knowledge_graph_path()
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            graphs = json.load(f)
+    else:
+        graphs = {}
+    
+    if session_id not in graphs:
+        graphs[session_id] = {
+            'concepts': [],
+            'relationships': [],
+            'created_at': datetime.now(timezone.utc).isoformat()
+        }
+    
+    graph = graphs[session_id]
+    
+    # Add new concepts (avoid duplicates)
+    existing_ids = {c['id'] for c in graph['concepts']}
+    for concept in concepts:
+        if concept['id'] not in existing_ids:
+            graph['concepts'].append(concept)
+            existing_ids.add(concept['id'])
+    
+    # Add new relationships (avoid duplicates)
+    existing_rels = {(r['source'], r['target'], r['type']) for r in graph['relationships']}
+    for rel in relationships:
+        key = (rel['source'], rel['target'], rel['type'])
+        if key not in existing_rels:
+            graph['relationships'].append(rel)
+            existing_rels.add(key)
+    
+    graph['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(graphs, f, indent=2)
+    
+    return graph
+
+def update_concept_mastery(session_id: str, concept_id: str, mastery: float):
+    """Update mastery level for a concept (0.0 to 1.0)"""
+    path = _knowledge_graph_path()
+    if not os.path.exists(path):
+        return None
+    
+    with open(path, 'r', encoding='utf-8') as f:
+        graphs = json.load(f)
+    
+    if session_id not in graphs:
+        return None
+    
+    for concept in graphs[session_id]['concepts']:
+        if concept['id'] == concept_id:
+            concept['mastery'] = min(1.0, max(0.0, mastery))
+            concept['updated_at'] = datetime.now(timezone.utc).isoformat()
+            break
+    
+    graphs[session_id]['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(graphs, f, indent=2)
+    
+    return graphs[session_id]

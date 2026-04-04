@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>TeachMeBack — Learn by Teaching</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
       :root {
         --primary: #6366f1;
@@ -161,6 +162,20 @@
         .whiteboard-btn span,.voice-btn span{display:none}
         .send-btn{padding:8px 14px}
       }
+      
+      /* Knowledge Graph Styles */
+      .kg-container{background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(236,72,153,0.1));backdrop-filter:blur(10px);padding:20px;border-radius:16px;border:1px solid rgba(99,102,241,0.3);margin-bottom:16px;display:none}
+      .kg-container.active{display:block}
+      .kg-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+      .kg-title{font-size:18px;font-weight:700;background:linear-gradient(90deg,#6366f1,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .kg-toggle-btn{background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.5);color:white;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:12px;transition:all 0.3s}
+      .kg-toggle-btn:hover{background:rgba(99,102,241,0.4)}
+      .kg-graph{width:100%;height:300px;background:rgba(15,23,42,0.5);border-radius:12px;overflow:hidden}
+      .kg-legend{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;justify-content:center}
+      .kg-legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary)}
+      .kg-legend-dot{width:12px;height:12px;border-radius:50%}
+      .node-label{font-size:11px;fill:white;font-weight:500;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,0.8)}
+      .link-label{font-size:10px;fill:var(--text-secondary);pointer-events:none}
     </style>
   </head>
   <body>
@@ -242,6 +257,29 @@
                 <div class="stat-label">Badges</div>
                 <div class="stat-value" id="userBadges">0</div>
               </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Knowledge Graph Visualization -->
+        <div class="kg-container" id="kgContainer">
+          <div class="kg-header">
+            <div class="kg-title">🧠 Knowledge Graph</div>
+            <button class="kg-toggle-btn" onclick="toggleKnowledgeGraph()">Hide</button>
+          </div>
+          <div class="kg-graph" id="kgGraph"></div>
+          <div class="kg-legend">
+            <div class="kg-legend-item">
+              <div class="kg-legend-dot" style="background:#10b981"></div>
+              <span>Mastered</span>
+            </div>
+            <div class="kg-legend-item">
+              <div class="kg-legend-dot" style="background:#f59e0b"></div>
+              <span>Learning</span>
+            </div>
+            <div class="kg-legend-item">
+              <div class="kg-legend-dot" style="background:#6366f1"></div>
+              <span>Related</span>
             </div>
           </div>
         </div>
@@ -491,6 +529,9 @@
         
         addMessage(message, 'user')
         input.value = ''
+        
+        // Extract concepts for knowledge graph
+        extractConceptsFromMessage(message)
         
         // Show loading state
         sendBtn.textContent = '...'
@@ -896,6 +937,198 @@
         document.getElementById('voiceStatus').classList.remove('active')
         document.getElementById('voiceBtn').classList.remove('recording')
         document.getElementById('userInput').placeholder = 'Explain the concept to your AI student...'
+      }
+
+      // ========== KNOWLEDGE GRAPH FUNCTIONS ==========
+      let kgData = {concepts: [], relationships: []}
+      let kgSimulation = null
+
+      function toggleKnowledgeGraph() {
+        const container = document.getElementById('kgContainer')
+        const btn = document.querySelector('.kg-toggle-btn')
+        if (container.classList.contains('active')) {
+          container.classList.remove('active')
+          btn.textContent = 'Show'
+        } else {
+          container.classList.add('active')
+          btn.textContent = 'Hide'
+          renderKnowledgeGraph()
+        }
+      }
+
+      async function extractConceptsFromMessage(message) {
+        if (!currentSessionId) return
+        
+        try {
+          const res = await fetch(API + '/teachmeback/knowledge-graph/' + currentSessionId + '/extract', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: message})
+          })
+          
+          if (res.ok) {
+            const data = await res.json()
+            kgData = data.graph
+            if (document.getElementById('kgContainer').classList.contains('active')) {
+              renderKnowledgeGraph()
+            }
+          }
+        } catch (e) {
+          console.error('Failed to extract concepts:', e)
+        }
+      }
+
+      async function loadKnowledgeGraph() {
+        if (!currentSessionId) return
+        
+        try {
+          const res = await fetch(API + '/teachmeback/knowledge-graph/' + currentSessionId)
+          if (res.ok) {
+            const data = await res.json()
+            kgData = data
+            if (document.getElementById('kgContainer').classList.contains('active')) {
+              renderKnowledgeGraph()
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load knowledge graph:', e)
+        }
+      }
+
+      function renderKnowledgeGraph() {
+        const container = document.getElementById('kgGraph')
+        container.innerHTML = ''
+        
+        if (kgData.concepts.length === 0) {
+          container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);">Start teaching to build your knowledge graph!</div>'
+          return
+        }
+        
+        const width = container.clientWidth
+        const height = container.clientHeight
+        
+        const svg = d3.select('#kgGraph')
+          .append('svg')
+          .attr('width', width)
+          .attr('height', height)
+          .attr('viewBox', [0, 0, width, height])
+          .style('max-width', '100%')
+          .style('height', 'auto')
+        
+        // Add zoom behavior
+        const g = svg.append('g')
+        
+        svg.call(d3.zoom()
+          .extent([[0, 0], [width, height]])
+          .scaleExtent([0.5, 4])
+          .on('zoom', (event) => {
+            g.attr('transform', event.transform)
+          }))
+        
+        // Prepare nodes and links
+        const nodes = kgData.concepts.map(c => ({
+          id: c.id,
+          name: c.name,
+          description: c.description,
+          mastery: c.mastery || 0.5,
+          radius: 20 + (c.mastery || 0.5) * 15
+        }))
+        
+        const links = kgData.relationships.map(r => ({
+          source: r.source,
+          target: r.target,
+          type: r.type
+        }))
+        
+        // Color scale based on mastery
+        const colorScale = d3.scaleLinear()
+          .domain([0, 0.5, 1])
+          .range(['#6366f1', '#f59e0b', '#10b981'])
+        
+        // Create force simulation
+        kgSimulation = d3.forceSimulation(nodes)
+          .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+          .force('charge', d3.forceManyBody().strength(-300))
+          .force('center', d3.forceCenter(width / 2, height / 2))
+          .force('collision', d3.forceCollide().radius(d => d.radius + 10))
+        
+        // Draw links
+        const link = g.append('g')
+          .attr('stroke', 'rgba(255,255,255,0.2)')
+          .attr('stroke-opacity', 0.6)
+          .selectAll('line')
+          .data(links)
+          .join('line')
+          .attr('stroke-width', 2)
+        
+        // Draw link labels
+        const linkLabel = g.append('g')
+          .selectAll('text')
+          .data(links)
+          .join('text')
+          .attr('class', 'link-label')
+          .text(d => d.type.replace(/_/g, ' '))
+          .attr('font-size', 9)
+          .attr('text-anchor', 'middle')
+          .attr('fill', 'var(--text-secondary)')
+        
+        // Draw nodes
+        const node = g.append('g')
+          .selectAll('g')
+          .data(nodes)
+          .join('g')
+          .call(d3.drag()
+            .on('start', (event, d) => {
+              if (!event.active) kgSimulation.alphaTarget(0.3).restart()
+              d.fx = d.x
+              d.fy = d.y
+            })
+            .on('drag', (event, d) => {
+              d.fx = event.x
+              d.fy = event.y
+            })
+            .on('end', (event, d) => {
+              if (!event.active) kgSimulation.alphaTarget(0)
+              d.fx = null
+              d.fy = null
+            }))
+        
+        // Node circles
+        node.append('circle')
+          .attr('r', d => d.radius)
+          .attr('fill', d => colorScale(d.mastery))
+          .attr('stroke', 'rgba(255,255,255,0.3)')
+          .attr('stroke-width', 2)
+          .style('cursor', 'pointer')
+          .on('mouseover', function(event, d) {
+            d3.select(this).attr('stroke', 'white').attr('stroke-width', 3)
+          })
+          .on('mouseout', function(event, d) {
+            d3.select(this).attr('stroke', 'rgba(255,255,255,0.3)').attr('stroke-width', 2)
+          })
+        
+        // Node labels
+        node.append('text')
+          .attr('class', 'node-label')
+          .text(d => d.name)
+          .attr('text-anchor', 'middle')
+          .attr('dy', d => d.radius + 15)
+          .attr('font-size', 11)
+        
+        // Update positions on tick
+        kgSimulation.on('tick', () => {
+          link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y)
+          
+          linkLabel
+            .attr('x', d => (d.source.x + d.target.x) / 2)
+            .attr('y', d => (d.source.y + d.target.y) / 2)
+          
+          node.attr('transform', d => `translate(${d.x},${d.y})`)
+        })
       }
 
       // ========== TYPING SPEED TRACKER FUNCTIONS ==========
