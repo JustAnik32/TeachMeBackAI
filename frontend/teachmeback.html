@@ -689,9 +689,9 @@
         pointLight.position.set(5, 5, 5)
         arScene.add(pointLight)
 
-        // Add mouse interaction
-        arCanvas.addEventListener('mousedown', startDrawing)
-        arCanvas.addEventListener('mousemove', draw)
+        // Add mouse interaction - use capture phase to intercept before OrbitControls
+        arCanvas.addEventListener('mousedown', startDrawing, true)  // true = capture phase
+        arCanvas.addEventListener('mousemove', draw, true)
         arCanvas.addEventListener('mouseup', stopDrawing)
         arCanvas.addEventListener('mouseleave', stopDrawing)
         arCanvas.addEventListener('touchstart', handleTouchStart, { passive: false })
@@ -734,6 +734,7 @@
         e.preventDefault()
         e.stopPropagation()
         isDrawing = true
+        if (arControls) arControls.enabled = false  // Disable orbit while drawing
         const coords = getARCoordinates(e)
         lastX = coords.x
         lastY = coords.y
@@ -768,6 +769,7 @@
 
       function stopDrawing() {
         isDrawing = false
+        if (arControls) arControls.enabled = true  // Re-enable orbit controls
       }
 
       function handleTouchStart(e) {
