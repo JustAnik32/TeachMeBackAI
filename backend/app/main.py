@@ -63,7 +63,12 @@ def call_openrouter(system_prompt: str, user_prompt: str, max_tokens: int = 300)
         if "image" in error_text.lower() and "does not support" in error_text.lower():
             raise HTTPException(status_code=400, detail=f"Selected AI model ({OPENROUTER_MODEL}) does not support image input. Please use a vision-capable model like 'openai/gpt-4o' or 'anthropic/claude-3-haiku'.")
         raise HTTPException(status_code=500, detail=f"OpenRouter error: {error_text}")
-    return response.json()['choices'][0]['message']['content']
+    
+    try:
+        result = response.json()
+        return result['choices'][0]['message']['content']
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI response parsing error: {str(e)}. Response: {response.text[:200]}")
 
 
 def check_plagiarism(user_response: str, ai_messages: list) -> dict:
