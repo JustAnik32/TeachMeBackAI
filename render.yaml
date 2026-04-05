@@ -9,5 +9,7 @@ services:
         sync: false
       - key: OPENROUTER_MODEL
         value: openai/gpt-4o
+      - key: GOOGLE_CLIENT_ID
+        sync: false
       - key: PYTHON_VERSION
         value: 3.11.0

@@ -461,11 +461,17 @@
       TeachMeBack — Learn more by teaching. The best way to learn is to teach.
     </footer>
 
+    <!-- Google Sign-In Script -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
     <script>
       // Production API URL - update this after deploying backend to Render
       const API = window.location.hostname === 'localhost'
         ? 'http://localhost:8000/api'
         : 'https://teachmebackai-oifm.onrender.com/api'
+
+      // Google Client ID - Replace with your actual Google OAuth Client ID
+      const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID_HERE'
 
       // Authentication functions
       async function handleLogin() {
@@ -641,6 +647,44 @@
         const userName = localStorage.getItem('userName')
         if (token && userName) {
           showMainApp(userName)
+        }
+      }
+
+      // Google Sign-In functions
+      function handleGoogleSignIn() {
+        // Initialize Google Sign-In if not already done
+        if (typeof google !== 'undefined' && google.accounts) {
+          google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: handleGoogleCredentialResponse
+          });
+          google.accounts.id.prompt();
+        } else {
+          alert('Google Sign-In is not loaded. Please refresh the page.');
+        }
+      }
+
+      async function handleGoogleCredentialResponse(response) {
+        try {
+          const res = await fetch(API + '/google-signin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ credential: response.credential })
+          });
+
+          const data = await res.json();
+
+          if (res.ok) {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('userName', data.name);
+            localStorage.setItem('userId', data.id);
+            localStorage.setItem('userEmail', data.email);
+            showMainApp(data.name);
+          } else {
+            showAuthError(data.detail || 'Google sign-in failed');
+          }
+        } catch (e) {
+          showAuthError('Connection error during Google sign-in');
         }
       }
 
