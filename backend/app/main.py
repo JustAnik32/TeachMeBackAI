@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header, Depends
+﻿from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import os
@@ -574,16 +574,8 @@ Keep it at {user_level} level, making learning engaging and quiz-like."""
 
 
 @app.post('/api/teachmeback/start')
-def start_teachmeback_session(payload: TeachMeBackSessionIn, authorization: Optional[str] = Header(None)):
-    """Start a new teaching session where user explains a concept to AI"""
-    # Authentication: require token
-    if not authorization:
-        raise HTTPException(status_code=401, detail='Authorization header required')
-    token = authorization.split('Bearer')[-1].strip()
-    user = data_store.get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail='Invalid token')
-
+def start_teachmeback_session(payload: TeachMeBackSessionIn):
+    """Start a new teaching session where user explains a concept to AI - NO AUTH REQUIRED"""
     if not OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
 
@@ -622,16 +614,8 @@ def start_teachmeback_session(payload: TeachMeBackSessionIn, authorization: Opti
 
 
 @app.post('/api/teachmeback/chat')
-def chat_teachmeback(payload: TeachMeBackMessageIn, authorization: Optional[str] = Header(None)):
-    """Continue a teaching session with a new message from the user"""
-    # Authentication: require token
-    if not authorization:
-        raise HTTPException(status_code=401, detail='Authorization header required')
-    token = authorization.split('Bearer')[-1].strip()
-    user = data_store.get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail='Invalid token')
-
+def chat_teachmeback(payload: TeachMeBackMessageIn):
+    """Continue a teaching session with a new message from the user - NO AUTH REQUIRED"""
     if not OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="OpenRouter API key not configured")
 
@@ -841,16 +825,8 @@ Keep it at {user_level} level, making learning engaging and quiz-like."""
 
 
 @app.post('/api/teachmeback/feedback')
-def provide_feedback(payload: TeachMeBackFeedbackIn, authorization: Optional[str] = Header(None)):
-    """User provides feedback on AI's understanding"""
-    # Authentication: require token
-    if not authorization:
-        raise HTTPException(status_code=401, detail='Authorization header required')
-    token = authorization.split('Bearer')[-1].strip()
-    user = data_store.get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail='Invalid token')
-
+def provide_feedback(payload: TeachMeBackFeedbackIn):
+    """User provides feedback on AI's understanding - NO AUTH REQUIRED"""
     session = data_store.get_teachmeback_session(payload.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -868,16 +844,8 @@ def provide_feedback(payload: TeachMeBackFeedbackIn, authorization: Optional[str
 
 
 @app.get('/api/teachmeback/session/{session_id}')
-def get_session_summary(session_id: str, authorization: Optional[str] = Header(None)):
-    """Get a summary of the teaching session including identified gaps"""
-    # Authentication: require token
-    if not authorization:
-        raise HTTPException(status_code=401, detail='Authorization header required')
-    token = authorization.split('Bearer')[-1].strip()
-    user = data_store.get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail='Invalid token')
-
+def get_session_summary(session_id: str):
+    """Get a summary of the teaching session including identified gaps - NO AUTH REQUIRED"""
     session = data_store.get_teachmeback_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -892,15 +860,8 @@ def get_session_summary(session_id: str, authorization: Optional[str] = Header(N
 
 
 @app.get('/api/teachmeback/topics')
-def get_topic_suggestions(authorization: Optional[str] = Header(None)):
-    """Get suggested topics for teaching"""
-    # Authentication: require token
-    if not authorization:
-        raise HTTPException(status_code=401, detail='Authorization header required')
-    token = authorization.split('Bearer')[-1].strip()
-    user = data_store.get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail='Invalid token')
+def get_topic_suggestions():
+    """Get suggested topics for teaching - NO AUTH REQUIRED"""
     return {
         'topics': [
             "Photosynthesis",
@@ -918,20 +879,14 @@ def get_topic_suggestions(authorization: Optional[str] = Header(None)):
 
 
 @app.get('/api/teachmeback/progress')
-def get_user_progress_endpoint(authorization: Optional[str] = Header(None)):
-    """Get user's gamification progress (points, badges, level, streaks)"""
-    # Authentication: require token
-    if not authorization:
-        raise HTTPException(status_code=401, detail='Authorization header required')
-    token = authorization.split('Bearer')[-1].strip()
-    user = data_store.get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail='Invalid token')
-
+def get_user_progress_endpoint():
+    """Get user's gamification progress - NO AUTH REQUIRED (anonymous mode)"""
+    # Use anonymous user for hackathon demo
+    user_id = 'anonymous'
     try:
-        progress = data_store.get_user_progress(user['id'])
+        progress = data_store.get_user_progress(user_id)
         return {
-            'user_id': user['id'],
+            'user_id': user_id,
             'points': progress['points'],
             'total_points_earned': progress['total_points_earned'],
             'level': progress['level'],
@@ -948,31 +903,15 @@ def get_user_progress_endpoint(authorization: Optional[str] = Header(None)):
 
 
 @app.get('/api/teachmeback/knowledge-graph/{session_id}')
-def get_knowledge_graph(session_id: str, authorization: Optional[str] = Header(None)):
-    """Get knowledge graph for a session"""
-    # Authentication: require token
-    if not authorization:
-        raise HTTPException(status_code=401, detail='Authorization header required')
-    token = authorization.split('Bearer')[-1].strip()
-    user = data_store.get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail='Invalid token')
-
+def get_knowledge_graph(session_id: str):
+    """Get knowledge graph for a session - NO AUTH REQUIRED"""
     graph = data_store.get_session_knowledge_graph(session_id)
     return graph
 
 
 @app.post('/api/teachmeback/knowledge-graph/{session_id}/extract')
-def extract_concepts(session_id: str, payload: dict, authorization: Optional[str] = Header(None)):
-    """Extract concepts and relationships from user message"""
-    # Authentication: require token
-    if not authorization:
-        raise HTTPException(status_code=401, detail='Authorization header required')
-    token = authorization.split('Bearer')[-1].strip()
-    user = data_store.get_user_by_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail='Invalid token')
-
+def extract_concepts(session_id: str, payload: dict):
+    """Extract concepts and relationships from user message - NO AUTH REQUIRED"""
     session = data_store.get_teachmeback_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")

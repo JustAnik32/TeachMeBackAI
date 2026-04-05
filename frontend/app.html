@@ -77,6 +77,26 @@
           <input type="text" id="customTopic" class="custom-topic" placeholder="Or type your own topic..." />
 
           <div style="margin-top:16px">
+            <label class="muted">Your level:</label>
+            <select id="userLevel" style="padding:10px;border-radius:8px;border:1px solid #e6eef8;margin-left:10px">
+              <option value="elementary">Elementary School</option>
+              <option value="middle_school">Middle School</option>
+              <option value="high_school" selected>High School</option>
+              <option value="college">College</option>
+            </select>
+          </div>
+
+          <div style="margin-top:16px">
+            <label class="muted">Your level:</label>
+            <select id="userLevel" style="padding:10px;border-radius:8px;border:1px solid #e6eef8;margin-left:10px">
+              <option value="elementary">Elementary School</option>
+              <option value="middle_school">Middle School</option>
+              <option value="high_school" selected>High School</option>
+              <option value="college">College</option>
+            </select>
+          </div>
+
+          <div style="margin-top:16px">
             <label class="muted">AI Teaching Agent:</label>
             <select id="teachingAgent" style="padding:10px;border-radius:8px;border:1px solid #e6eef8;margin-left:10px;width:200px">
               <option value="curious_student" selected>🎓 Curious Student</option>
@@ -187,37 +207,8 @@
           document.getElementById('agentDescription').innerHTML = agentDescriptions[currentAgent]
         })
 
-        // Check authentication
-        if (!authToken) {
-          window.location.href = 'login.html'
-          return
-        }
-
-        // Verify token and show app
-        verifyToken()
-      }
-
-      async function verifyToken() {
-        try {
-          const res = await fetch(API + '/me', {
-            headers: { 'Authorization': 'Bearer ' + authToken }
-          })
-
-          if (res.ok) {
-            const data = await res.json()
-            currentUser = data
-            document.getElementById('userInfo').style.display = 'flex'
-            document.getElementById('userName').textContent = currentUser.name
-            document.getElementById('backBtn').style.display = 'block'
-            showStartScreen()
-          } else {
-            localStorage.removeItem('authToken')
-            window.location.href = 'login.html'
-          }
-        } catch (e) {
-          localStorage.removeItem('authToken')
-          window.location.href = 'login.html'
-        }
+        // No auth required - show app immediately
+        showStartScreen()
       }
 
       function showStartScreen() {
@@ -228,10 +219,7 @@
       }
 
       function logout() {
-        authToken = null
-        currentUser = null
-        localStorage.removeItem('authToken')
-        window.location.href = 'login.html'
+        // No-op - no auth in hackathon demo
       }
 
       let tabSwitchCount = 0
@@ -282,8 +270,7 @@
           const res = await fetch(API + '/teachmeback/start', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + authToken
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify({ topic, user_level: level, agent_type: currentAgent })
           })
@@ -331,8 +318,7 @@
           const res = await fetch(API + '/teachmeback/chat', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + authToken
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify({ session_id: currentSessionId, message })
           })
