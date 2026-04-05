@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import os
@@ -8,10 +8,16 @@ from datetime import datetime, timezone
 import uuid
 import hmac
 import hashlib
-import os
 import json
 from dotenv import load_dotenv
+from sqlalchemy.orm import Session
+from passlib.context import CryptContext
+from . import database, models, utils, data_store
+
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+
+# Create database tables
+models.Base.metadata.create_all(bind=database.engine)
 
 # secrets (for demo; set env vars in production)
 SECRET_KEY = os.environ.get('MICROCLINIC_SECRET', 'dev_secret_change_me').encode('utf-8')
@@ -162,13 +168,14 @@ class ActionIn(BaseModel):
 
 class RegisterIn(BaseModel):
     name: str
+    email: str
     phone: str
     password: str
-    admin_code: str
+    admin_code: Optional[str] = None
 
 
 class LoginIn(BaseModel):
-    phone: str
+    email_or_phone: str
     password: str
 
 app = FastAPI(title="MicroClinic MVP")
@@ -292,28 +299,79 @@ def case_action(case_id: str, payload: ActionIn, authorization: Optional[str] = 
 
 
 @app.post('/api/register')
-def register(payload: RegisterIn):
-    # require admin code to register CHWs (demo)
-    if payload.admin_code != ADMIN_CODE:
-        raise HTTPException(status_code=403, detail='Invalid admin code')
-    existing = data_store.get_user_by_phone(payload.phone)
-    if existing:
-        raise HTTPException(status_code=400, detail='Phone already registered')
-    user = data_store.create_user(payload.name, payload.phone, payload.password)
-    if not user:
-        raise HTTPException(status_code=500, detail='Unable to create user')
-    return {'token': user.get('token'), 'name': user.get('name'), 'id': user.get('id')}
+def register(payload: RegisterIn, db: Session = Depends(database.get_db)):
+    # Check if email already exists
+    existing_email = db.query(models.User).filter(models.User.email == payload.email).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail='Email already registered')
+    
+    # Check if phone already exists (if provided)
+    if payload.phone:
+        existing_phone = db.query(models.User).filter(models.User.phone == payload.phone).first()
+        if existing_phone:
+            raise HTTPException(status_code=400, detail='Phone already registered')
+    
+    # Create new user
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+    hashed_password = pwd_context.hash(payload.password)
+    
+    db_user = models.User(
+        email=payload.email,
+        phone=payload.phone,
+        name=payload.name,
+        hashed_password=hashed_password,
+        is_admin=bool(payload.admin_code == ADMIN_CODE) if payload.admin_code else False
+    )
+    
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    # Create session token
+    import uuid
+    token = uuid.uuid4().hex
+    
+    # Store token in user record (simplified approach)
+    # In production, you'd use a separate tokens table or JWT
+    db_user.hashed_password = db_user.hashed_password + f":{token}"  # Simple token storage
+    db.commit()
+    
+    return {'token': token, 'name': db_user.name, 'id': db_user.id}
 
 
 @app.post('/api/login')
-def login(payload: LoginIn):
-    user = data_store.verify_user_credentials(payload.phone, payload.password)
+def login(payload: LoginIn, db: Session = Depends(database.get_db)):
+    # Find user by email or phone
+    user = db.query(models.User).filter(
+        (models.User.email == payload.email_or_phone) | 
+        (models.User.phone == payload.email_or_phone)
+    ).first()
+    
     if not user:
         raise HTTPException(status_code=401, detail='Invalid credentials')
-    # issue a fresh token
+    
+    # Verify password
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+    
+    # Extract password hash (handle token storage format)
+    stored_hash = user.hashed_password
+    if ":" in stored_hash:
+        stored_hash = stored_hash.split(":")[0]  # Remove token if present
+    
+    if not pwd_context.verify(payload.password, stored_hash):
+        raise HTTPException(status_code=401, detail='Invalid credentials')
+    
+    # Generate new token
+    import uuid
     token = uuid.uuid4().hex
-    data_store.set_user_token(user.get('id'), token)
-    return {'token': token, 'name': user.get('name'), 'id': user.get('id')}
+    
+    # Store token with password (simple approach)
+    user.hashed_password = f"{stored_hash}:{token}"
+    db.commit()
+    
+    return {'token': token, 'name': user.name, 'id': user.id}
 
 
 @app.get('/api/me')
