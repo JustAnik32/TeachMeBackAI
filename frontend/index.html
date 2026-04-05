@@ -158,6 +158,20 @@
               <option value="college">College</option>
             </select>
           </div>
+
+          <div style="margin-top:16px">
+            <label class="muted">AI Teaching Agent:</label>
+            <select id="teachingAgent" style="padding:10px;border-radius:8px;border:1px solid #e6eef8;margin-left:10px;width:200px">
+              <option value="curious_student" selected>🎓 Curious Student</option>
+              <option value="expert_reviewer">🎯 Expert Reviewer</option>
+              <option value="socratic_guide">🧠 Socratic Guide</option>
+              <option value="peer_learner">👥 Peer Learner</option>
+              <option value="quiz_master">❓ Quiz Master</option>
+            </select>
+            <div id="agentDescription" style="margin-top:8px;font-size:13px;color:#6b7280;padding:8px;background:#f8fafc;border-radius:6px;border:1px solid #e6eef8">
+              <strong>🎓 Curious Student:</strong> A beginner student who asks enthusiastic questions and shows genuine curiosity about learning.
+            </div>
+          </div>
           
           <button class="btn" style="margin-top:20px" onclick="startSession()">Start Teaching →</button>
         </div>
@@ -172,7 +186,7 @@
         </div>
         
         <div class="session-info">
-          <h3>🎓 Teaching Mode Active <span id="tabMonitor" style="font-size:12px;color:#f59e0b;margin-left:10px;">● Tab Monitoring ON</span></h3>
+          <h3>🎓 Teaching Mode Active <span id="currentAgentBadge" style="font-size:12px;background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:12px;margin-left:8px;"></span> <span id="tabMonitor" style="font-size:12px;color:#f59e0b;margin-left:10px;">● Tab Monitoring ON</span></h3>
           <p style="margin:0;color:#166534" id="sessionTopic"></p>
         </div>
         
@@ -205,8 +219,25 @@
 
       let currentSessionId = null
       let currentTopic = ''
+      let currentAgent = 'curious_student'
       let authToken = localStorage.getItem('authToken') || null
       let currentUser = null
+
+      const agentDescriptions = {
+        curious_student: '<strong>🎓 Curious Student:</strong> A beginner student who asks enthusiastic questions and shows genuine curiosity about learning.',
+        expert_reviewer: '<strong>🎯 Expert Reviewer:</strong> An expert who challenges your understanding, tests assumptions, and pushes for deeper analysis.',
+        socratic_guide: '<strong>🧠 Socratic Guide:</strong> Uses the Socratic method to guide your thinking through questioning rather than direct teaching.',
+        peer_learner: '<strong>👥 Peer Learner:</strong> Acts like a fellow student at your level, learning alongside you with collaborative questions.',
+        quiz_master: '<strong>❓ Quiz Master:</strong> Focuses on testing your knowledge with targeted questions and immediate feedback.'
+      }
+
+      const agentDisplayNames = {
+        curious_student: '🎓 Curious Student',
+        expert_reviewer: '🎯 Expert Reviewer',
+        socratic_guide: '🧠 Socratic Guide',
+        peer_learner: '👥 Peer Learner',
+        quiz_master: '❓ Quiz Master'
+      }
 
       const topics = [
         "Photosynthesis",
@@ -231,6 +262,12 @@
             document.getElementById('customTopic').value = topic
           }
           grid.appendChild(btn)
+        })
+
+        // Agent selection handler
+        document.getElementById('teachingAgent').addEventListener('change', (e) => {
+          currentAgent = e.target.value
+          document.getElementById('agentDescription').innerHTML = agentDescriptions[currentAgent]
         })
 
         // Initialize Google Sign-In
@@ -678,6 +715,7 @@
         currentTopic = topic
         document.getElementById('sessionTopic').textContent = `Teaching: ${topic} (${level.replace('_', ' ')})`
         document.getElementById('topicDisplay').textContent = topic
+        document.getElementById('currentAgentBadge').textContent = agentDisplayNames[currentAgent] || '🎓 Curious Student'
         tabSwitchCount = 0
         isSessionActive = true
 
@@ -688,7 +726,7 @@
               'Content-Type': 'application/json',
               'Authorization': 'Bearer ' + authToken
             },
-            body: JSON.stringify({ topic, user_level: level })
+            body: JSON.stringify({ topic, user_level: level, agent_type: currentAgent })
           })
           
           const data = await res.json()
