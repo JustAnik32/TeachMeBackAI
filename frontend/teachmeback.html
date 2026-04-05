@@ -1,0 +1,1188 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>TeachMeBack — Learn by Teaching</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      :root {
+        --primary: #6366f1;
+        --primary-dark: #4f46e5;
+        --secondary: #ec4899;
+        --accent: #06b6d4;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --bg-dark: #0f172a;
+        --card-bg: rgba(30, 41, 59, 0.9);
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+      }
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#312e81 100%);margin:0;color:var(--text-primary);min-height:100vh;overflow-x:hidden}
+      
+      /* Animated background shapes */
+      .floating-shapes{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;overflow:hidden;pointer-events:none}
+      .shape{position:absolute;border-radius:50%;filter:blur(100px);opacity:0.4;animation:float 20s infinite ease-in-out}
+      .shape-1{width:500px;height:500px;background:#6366f1;top:-200px;right:-100px;animation-delay:0s}
+      .shape-2{width:400px;height:400px;background:#ec4899;bottom:-100px;left:-100px;animation-delay:-7s}
+      .shape-3{width:350px;height:350px;background:#06b6d4;top:40%;left:40%;animation-delay:-14s}
+      @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(50px,-50px) scale(1.1)}66%{transform:translate(-30px,30px) scale(0.9)}}
+      
+      header{padding:24px 40px;background:rgba(15,23,42,0.8);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+      .logo{width:50px;height:50px;border-radius:16px;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:28px;box-shadow:0 0 30px rgba(99,102,241,0.5);animation:pulse 2s infinite}
+      @keyframes pulse{0%,100%{box-shadow:0 0 20px rgba(99,102,241,0.4)}50%{box-shadow:0 0 40px rgba(99,102,241,0.7)}}
+      .title{font-size:26px;font-weight:800;background:linear-gradient(90deg,#6366f1,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .subtitle{font-size:13px;color:var(--text-secondary);font-weight:500}
+      .back-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;padding:12px 24px;border-radius:12px;cursor:pointer;font-weight:600;font-size:14px;transition:all 0.3s ease}
+      .back-btn:hover{background:rgba(255,255,255,0.2);transform:translateY(-2px);box-shadow:0 8px 25px rgba(99,102,241,0.3)}
+      .card{background:var(--card-bg);backdrop-filter:blur(20px);border-radius:24px;border:1px solid rgba(255,255,255,0.1);padding:40px;margin-bottom:24px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);transition:all 0.3s ease}
+      .card:hover{box-shadow:0 35px 60px -15px rgba(99,102,241,0.2)}
+      h2{margin:0 0 12px 0;font-size:32px;font-weight:800;background:linear-gradient(90deg,#6366f1,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .muted{color:var(--text-secondary);font-size:15px;line-height:1.7}
+      .topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:24px}
+      .topic-btn{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:20px;text-align:left;cursor:pointer;transition:all 0.3s ease;font-size:14px;color:var(--text-primary);font-weight:500}
+      .topic-btn:hover{background:rgba(99,102,241,0.2);border-color:rgba(99,102,241,0.5);transform:translateY(-4px);box-shadow:0 12px 30px rgba(99,102,241,0.3)}
+      .topic-btn.selected{background:linear-gradient(135deg,#6366f1,#ec4899);border-color:transparent;box-shadow:0 8px 30px rgba(99,102,241,0.5)}
+      .custom-topic{width:100%;padding:20px 24px;border-radius:16px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--text-primary);font-size:16px;margin-top:20px;transition:all 0.3s ease}
+      .custom-topic:focus{outline:none;border-color:#6366f1;box-shadow:0 0 20px rgba(99,102,241,0.3)}
+      .custom-topic::placeholder{color:var(--text-secondary)}
+      .btn{background:linear-gradient(135deg,#6366f1,#ec4899);border:none;color:white;padding:18px 36px;border-radius:16px;font-weight:700;cursor:pointer;font-size:16px;transition:all 0.3s ease;box-shadow:0 10px 30px rgba(99,102,241,0.4);position:relative;overflow:hidden}
+      .btn:hover{transform:translateY(-3px);box-shadow:0 15px 40px rgba(99,102,241,0.6)}
+      .btn:active{transform:translateY(-1px)}
+      .chat-container{display:none;flex-direction:column;gap:20px;height:600px}
+      .chat-container.active{display:flex;animation:fadeIn 0.5s ease}
+      @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+      .messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding:20px;background:rgba(15,23,42,0.6);border-radius:20px;border:1px solid rgba(255,255,255,0.05)}
+      .message{padding:16px 20px;border-radius:20px;max-width:85%;line-height:1.6;font-size:15px;animation:messagePop 0.3s ease}
+      @keyframes messagePop{from{opacity:0;transform:scale(0.9) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+      .message.ai{background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);align-self:flex-start;border-bottom-left-radius:6px;color:var(--text-primary)}
+      .message.user{background:linear-gradient(135deg,#6366f1,#ec4899);color:white;align-self:flex-end;border-bottom-right-radius:6px;box-shadow:0 4px 20px rgba(99,102,241,0.4)}
+      .message.evaluation{background:linear-gradient(135deg,rgba(245,158,11,0.15),rgba(239,68,68,0.15));border:1px solid rgba(245,158,11,0.4);align-self:center;max-width:90%;font-size:14px;color:#fbbf24;padding:14px 20px;border-radius:16px}
+      .input-area{display:flex;gap:12px;padding:8px;background:rgba(255,255,255,0.05);border-radius:20px;border:1px solid rgba(255,255,255,0.1)}
+      .input-area input{flex:1;padding:16px 20px;border-radius:16px;border:none;background:transparent;color:var(--text-primary);font-size:15px;outline:none}
+      .input-area input::placeholder{color:var(--text-secondary)}
+      .send-btn{background:linear-gradient(135deg,#6366f1,#ec4899);border:none;color:white;padding:16px 28px;border-radius:16px;font-weight:600;cursor:pointer;font-size:15px;transition:all 0.3s ease;box-shadow:0 4px 15px rgba(99,102,241,0.4)}
+      .send-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,0.5)}
+      .send-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+      .session-info{background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(6,182,212,0.15));backdrop-filter:blur(10px);padding:20px 24px;border-radius:20px;border:1px solid rgba(16,185,129,0.3);margin-bottom:16px}
+      .session-info h3{margin:0 0 8px 0;color:var(--success);font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+      .session-info p{margin:0;color:var(--text-primary);font-size:18px;font-weight:600}
+      .gamification-bar{display:none;background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(236,72,153,0.2));backdrop-filter:blur(10px);padding:16px 24px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);margin-bottom:16px}
+      .gamification-bar.active{display:block;animation:slideDown 0.5s ease}
+      @keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+      .stats-grid{display:flex;justify-content:space-around;flex-wrap:wrap;gap:16px}
+      .stat-item{display:flex;align-items:center;gap:12px;padding:8px 16px;background:rgba(255,255,255,0.05);border-radius:12px}
+      .stat-icon{font-size:24px}
+      .stat-label{font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+      .stat-value{font-size:18px;font-weight:700;color:var(--text-primary)}
+      .gaps-section{display:none;margin-top:20px}
+      .gaps-section.active{display:block}
+      .gap-item{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:12px;border-radius:8px;margin-bottom:8px;color:#fca5a5;font-size:13px}
+      .topic-display{font-size:18px;font-weight:600;margin-bottom:16px;background:linear-gradient(90deg,#6366f1,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .start-screen{display:block}
+      .start-screen.hidden{display:none}
+      .instructions{background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);padding:16px;border-radius:10px;margin-bottom:16px;color:#818cf8}
+      footer{max-width:900px;margin:40px auto;color:var(--text-secondary);font-size:13px;padding:0 20px;text-align:center}
+      .hidden{display:none!important}
+      
+      /* AR Whiteboard Styles */
+      .ar-whiteboard-container{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.95);z-index:2000;flex-direction:column}
+      .ar-whiteboard-container.active{display:flex}
+      .ar-header{padding:20px;background:rgba(30,41,59,0.9);backdrop-filter:blur(20px);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1)}
+      .ar-title{font-size:20px;font-weight:700;background:linear-gradient(90deg,#6366f1,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .ar-controls{display:flex;gap:12px;align-items:center}
+      .ar-btn{background:linear-gradient(135deg,#6366f1,#ec4899);border:none;color:white;padding:12px 24px;border-radius:12px;font-weight:600;cursor:pointer;font-size:14px;transition:all 0.3s ease}
+      .ar-btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(99,102,241,0.4)}
+      .ar-btn.secondary{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2)}
+      .ar-btn.secondary:hover{background:rgba(255,255,255,0.2)}
+      .color-picker{display:flex;gap:8px}
+      .color-btn{width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:all 0.3s ease}
+      .color-btn:hover{transform:scale(1.1)}
+      .color-btn.active{border-color:white;box-shadow:0 0 10px rgba(255,255,255,0.5)}
+      .ar-canvas{flex:1;position:relative}
+      .ar-3d-canvas{width:100%;height:100%}
+      .ar-instructions{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);padding:12px 24px;border-radius:20px;font-size:14px;color:white}
+      .whiteboard-btn{background:linear-gradient(135deg,#06b6d4,#6366f1);border:none;color:white;padding:12px 20px;border-radius:12px;font-weight:600;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;transition:all 0.3s ease;margin-left:10px}
+      .whiteboard-btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(6,182,212,0.4)}
+      
+      /* Voice Input Button */
+      .voice-btn{background:linear-gradient(135deg,#ef4444,#ec4899);border:none;color:white;padding:12px 20px;border-radius:12px;font-weight:600;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;transition:all 0.3s ease;margin-left:10px;position:relative;overflow:hidden}
+      .voice-btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(239,68,68,0.4)}
+      .voice-btn.recording{animation:pulse-red 1s infinite;background:linear-gradient(135deg,#dc2626,#991b1b)}
+      @keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.7)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+      .voice-btn::before{content:'';position:absolute;top:50%;left:50%;width:0;height:0;background:rgba(255,255,255,0.3);border-radius:50%;transform:translate(-50%,-50%);transition:width 0.3s,height 0.3s}
+      .voice-btn:active::before{width:100px;height:100px}
+      
+      /* Voice Status */
+      .voice-status{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#ef4444,#ec4899);color:white;padding:16px 32px;border-radius:20px;font-size:16px;font-weight:600;box-shadow:0 10px 40px rgba(239,68,68,0.4);z-index:1000;display:none;animation:slideUp 0.3s ease}
+      .voice-status.active{display:block}
+      .voice-status .listening{animation:pulse 1s infinite}
+      @keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+      
+      /* Typing Speed Tracker */
+      .typing-speed-widget{background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(6,182,212,0.15));backdrop-filter:blur(10px);padding:12px 20px;border-radius:16px;border:1px solid rgba(16,185,129,0.3);margin-bottom:16px;display:flex;justify-content:space-around;align-items:center;flex-wrap:wrap;gap:16px}
+      .speed-stat{text-align:center}
+      .speed-label{font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+      .speed-value{font-size:24px;font-weight:800;background:linear-gradient(90deg,#10b981,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .speed-unit{font-size:12px;color:var(--text-secondary)}
+      .typing-indicator{font-size:13px;color:var(--success);font-weight:500;animation:pulse 1s infinite}
+      
+      /* Mobile Responsive */
+      @media (max-width: 768px) {
+        header{padding:12px 16px}
+        .title{font-size:20px}
+        .subtitle{font-size:12px}
+        main{padding:12px}
+        .card{padding:16px}
+        .topic-grid{grid-template-columns:1fr}
+        .input-area{flex-wrap:nowrap;gap:8px;padding:12px}
+        .input-area input{font-size:16px;padding:10px 14px;min-width:0;flex:1}
+        .whiteboard-btn,.voice-btn{padding:10px 14px;font-size:13px;margin-left:4px}
+        .send-btn{padding:10px 16px;font-size:13px;white-space:nowrap}
+        .typing-speed-widget{padding:10px 12px;gap:12px}
+        .speed-value{font-size:18px}
+        .speed-label{font-size:10px}
+        .gamification-bar{padding:8px 12px;gap:8px}
+        .gamification-bar span{font-size:12px}
+        .messages{max-height:calc(100vh - 280px)}
+        .ar-header{padding:12px 16px}
+        .ar-title{font-size:16px}
+        .ar-btn{padding:10px 16px;font-size:12px}
+        .color-btn{width:28px;height:28px}
+      }
+      
+      @media (max-width: 480px) {
+        .title{font-size:18px}
+        .logo{width:36px;height:36px;font-size:20px}
+        .input-area{padding:10px}
+        .whiteboard-btn,.voice-btn{padding:8px 12px}
+        .whiteboard-btn span,.voice-btn span{display:none}
+        .send-btn{padding:8px 14px}
+      }
+      
+      /* Knowledge Graph Styles */
+      .kg-container{background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(236,72,153,0.1));backdrop-filter:blur(10px);padding:20px;border-radius:16px;border:1px solid rgba(99,102,241,0.3);margin-bottom:16px;display:none}
+      .kg-container.active{display:block}
+      .kg-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+      .kg-title{font-size:18px;font-weight:700;background:linear-gradient(90deg,#6366f1,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .kg-toggle-btn{background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.5);color:white;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:12px;transition:all 0.3s}
+      .kg-toggle-btn:hover{background:rgba(99,102,241,0.4)}
+      .kg-graph{width:100%;height:300px;background:rgba(15,23,42,0.5);border-radius:12px;overflow:hidden}
+      .kg-legend{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;justify-content:center}
+      .kg-legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary)}
+      .kg-legend-dot{width:12px;height:12px;border-radius:50%}
+      .node-label{font-size:11px;fill:white;font-weight:500;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,0.8)}
+      .link-label{font-size:10px;fill:var(--text-secondary);pointer-events:none}
+    </style>
+  </head>
+  <body>
+    <!-- Animated background shapes -->
+    <div class="floating-shapes">
+      <div class="shape shape-1"></div>
+      <div class="shape shape-2"></div>
+      <div class="shape shape-3"></div>
+    </div>
+
+    <header>
+      <div class="logo">📚</div>
+      <div>
+        <div class="title">TeachMeBack</div>
+        <div class="subtitle">Learn by teaching an AI student</div>
+      </div>
+      <button class="back-btn" onclick="showStartScreen()">← New Session</button>
+    </header>
+
+    <main>
+      <div id="startScreen" class="start-screen">
+        <div class="card">
+          <h2>What do you want to teach?</h2>
+          <p class="muted">Select a topic or enter your own. You'll explain it to an AI student who asks questions to help you master the subject.</p>
+          
+          <div class="topic-grid" id="topicGrid"></div>
+          
+          <input type="text" id="customTopic" class="custom-topic" placeholder="Or type your own topic..." />
+          
+          <div style="margin-top:20px">
+            <label class="muted">Your level:</label>
+            <select id="userLevel" style="padding:12px 20px;border-radius:12px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--text-primary);margin-left:12px;font-size:14px">
+              <option value="elementary">Elementary School</option>
+              <option value="middle_school">Middle School</option>
+              <option value="high_school" selected>High School</option>
+              <option value="college">College</option>
+            </select>
+          </div>
+          
+          <button class="btn" style="margin-top:28px" onclick="startSession()">Start Teaching →</button>
+        </div>
+      </div>
+
+      <div id="chatContainer" class="chat-container">
+        <div class="session-info">
+          <h3>🎓 Teaching Mode Active</h3>
+          <p id="sessionTopic">Topic will appear here</p>
+        </div>
+        
+        <!-- Gamification Stats Bar -->
+        <div class="gamification-bar" id="gamificationBar">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-icon">⭐</span>
+              <div>
+                <div class="stat-label">Level</div>
+                <div class="stat-value" id="userLevelDisplay">Beginner</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-icon">🔥</span>
+              <div>
+                <div class="stat-label">Streak</div>
+                <div class="stat-value" id="userStreak">0</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-icon">💎</span>
+              <div>
+                <div class="stat-label">Points</div>
+                <div class="stat-value" id="userPoints">0</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-icon">🏆</span>
+              <div>
+                <div class="stat-label">Badges</div>
+                <div class="stat-value" id="userBadges">0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Knowledge Graph Visualization -->
+        <div class="kg-container" id="kgContainer">
+          <div class="kg-header">
+            <div class="kg-title">🧠 Knowledge Graph</div>
+            <button class="kg-toggle-btn" onclick="toggleKnowledgeGraph()">Hide</button>
+          </div>
+          <div class="kg-graph" id="kgGraph"></div>
+          <div class="kg-legend">
+            <div class="kg-legend-item">
+              <div class="kg-legend-dot" style="background:#10b981"></div>
+              <span>Mastered</span>
+            </div>
+            <div class="kg-legend-item">
+              <div class="kg-legend-dot" style="background:#f59e0b"></div>
+              <span>Learning</span>
+            </div>
+            <div class="kg-legend-item">
+              <div class="kg-legend-dot" style="background:#6366f1"></div>
+              <span>Related</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Typing Speed Tracker -->
+        <div class="typing-speed-widget" id="typingSpeedWidget">
+          <div class="speed-stat">
+            <div class="speed-label">Current WPM</div>
+            <div class="speed-value" id="currentWPM">0</div>
+            <div class="speed-unit">words/min</div>
+          </div>
+          <div class="speed-stat">
+            <div class="speed-label">Average WPM</div>
+            <div class="speed-value" id="avgWPM">0</div>
+            <div class="speed-unit">words/min</div>
+          </div>
+          <div class="speed-stat">
+            <div class="speed-label">Session Best</div>
+            <div class="speed-value" id="bestWPM">0</div>
+            <div class="speed-unit">words/min</div>
+          </div>
+          <div class="typing-indicator" id="typingIndicator" style="display:none">⚡ Typing...</div>
+        </div>
+        
+        <div class="card" style="flex:1;display:flex;flex-direction:column;padding:20px;">
+          <div class="messages" id="messages"></div>
+          
+          <div class="input-area" style="margin-top:16px;">
+            <input type="text" id="userInput" placeholder="Explain the concept to your AI student..." onkeypress="if(event.key==='Enter')sendMessage()" />
+            <button class="whiteboard-btn" onclick="openWhiteboard()" title="Open 3D Whiteboard">🎨</button>
+            <button class="voice-btn" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input">🎤</button>
+            <button class="send-btn" onclick="sendMessage()">Send</button>
+          </div>
+        </div>
+        
+        <div class="gaps-section" id="gapsSection">
+          <h3 style="color:#991b1b">📌 Knowledge Gaps Identified</h3>
+          <div id="gapsList"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- AR Whiteboard Container -->
+    <div id="arWhiteboard" class="ar-whiteboard-container">
+      <div class="ar-header">
+        <div class="ar-title">🎨 3D AR Whiteboard</div>
+        <div class="ar-controls">
+          <div class="color-picker">
+            <div class="color-btn active" style="background:#ffffff" data-color="#ffffff" onclick="setDrawColor('#ffffff', this)"></div>
+            <div class="color-btn" style="background:#6366f1" data-color="#6366f1" onclick="setDrawColor('#6366f1', this)"></div>
+            <div class="color-btn" style="background:#ec4899" data-color="#ec4899" onclick="setDrawColor('#ec4899', this)"></div>
+            <div class="color-btn" style="background:#10b981" data-color="#10b981" onclick="setDrawColor('#10b981', this)"></div>
+            <div class="color-btn" style="background:#f59e0b" data-color="#f59e0b" onclick="setDrawColor('#f59e0b', this)"></div>
+            <div class="color-btn" style="background:#ef4444" data-color="#ef4444" onclick="setDrawColor('#ef4444', this)"></div>
+          </div>
+          <button class="ar-btn secondary" onclick="clearWhiteboard()">🗑️ Clear</button>
+          <button class="ar-btn" onclick="saveWhiteboard()">💾 Save to Chat</button>
+          <button class="ar-btn secondary" onclick="closeWhiteboard()">✕ Close</button>
+        </div>
+      </div>
+      <div class="ar-canvas">
+        <canvas id="arCanvas" class="ar-3d-canvas"></canvas>
+        <div class="ar-instructions">
+          🖱️ Click & drag to draw | 🖼️ Draw diagrams, equations, or illustrations
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      TeachMeBack — Learn more by teaching. The best way to learn is to teach.
+    </footer>
+
+    <script>
+      // Production API URL - update this after deploying backend to Render
+      const API = window.location.hostname === 'localhost' 
+        ? 'http://localhost:8000/api'
+        : 'https://teachmebackai-oifm.onrender.com/api'
+      
+      let currentSessionId = null
+      let currentTopic = ''
+
+      // Typing Speed Tracker Variables
+      let typingStartTime = null
+      let typingCharCount = 0
+      let typingMeasurements = []
+      let bestWPM = 0
+      let isTyping = false
+      let typingTimeout = null
+
+      const topics = [
+        "Photosynthesis",
+        "Quadratic Equations",
+        "The Water Cycle",
+        "Newton's Laws of Motion",
+        "DNA and Genetics",
+        "Supply and Demand",
+        "World War II",
+        "Cellular Respiration",
+        "Pythagorean Theorem",
+        "Chemical Bonds"
+      ]
+
+      function init() {
+        const grid = document.getElementById('topicGrid')
+        topics.forEach(topic => {
+          const btn = document.createElement('div')
+          btn.className = 'topic-btn'
+          btn.textContent = topic
+          btn.onclick = () => {
+            document.getElementById('customTopic').value = topic
+          }
+          grid.appendChild(btn)
+        })
+      }
+
+      let isSessionActive = false
+
+      async function startSession() {
+        const topic = document.getElementById('customTopic').value.trim()
+        const level = document.getElementById('userLevel').value
+        const startBtn = document.querySelector('.btn[onclick="startSession()"]')
+        
+        if (!topic) {
+          alert('Please select or enter a topic')
+          return
+        }
+
+        currentTopic = topic
+        document.getElementById('sessionTopic').textContent = topic
+        isSessionActive = true
+
+        // Show loading state
+        startBtn.textContent = 'Loading AI Student...'
+        startBtn.disabled = true
+
+        try {
+          const res = await fetch(API + '/teachmeback/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic, user_level: level })
+          })
+          
+          const data = await res.json()
+          
+          if (res.ok) {
+            currentSessionId = data.session_id
+            document.getElementById('startScreen').classList.add('hidden')
+            document.getElementById('chatContainer').classList.add('active')
+            document.getElementById('gamificationBar').classList.add('active')
+            
+            const messages = document.getElementById('messages')
+            messages.innerHTML = ''
+            
+            addMessage(data.message, 'ai')
+            addMessage('📝 ' + data.instructions, 'ai')
+            
+            // Load user progress
+            loadUserProgress()
+          } else {
+            alert('Error: ' + (data.detail || 'Failed to start session'))
+          }
+        } catch (e) {
+          alert('Cannot connect to server. Make sure the backend is running on port 8000.')
+          console.error(e)
+        } finally {
+          // Reset button
+          startBtn.textContent = 'Start Teaching'
+          startBtn.disabled = false
+        }
+      }
+
+      function addMessage(text, sender) {
+        const messages = document.getElementById('messages')
+        const div = document.createElement('div')
+        div.className = `message ${sender}`
+        div.textContent = text
+        messages.appendChild(div)
+        messages.scrollTop = messages.scrollHeight
+      }
+
+      async function sendMessage() {
+        const input = document.getElementById('userInput')
+        const sendBtn = document.querySelector('.send-btn')
+        const message = input.value.trim()
+        
+        if (!message || !currentSessionId) return
+        
+        // Calculate final typing speed for this message
+        if (typingStartTime && typingCharCount > 0) {
+          const duration = (Date.now() - typingStartTime) / 60000 // minutes
+          const words = message.split(/\s+/).length
+          const wpm = duration > 0 ? Math.round(words / duration) : 0
+          
+          if (wpm > 0) {
+            typingMeasurements.push(wpm)
+            if (wpm > bestWPM) bestWPM = wpm
+            updateTypingDisplay()
+          }
+        }
+        
+        // Reset typing tracker
+        resetTypingTracker()
+        
+        addMessage(message, 'user')
+        input.value = ''
+        
+        // Extract concepts for knowledge graph
+        extractConceptsFromMessage(message)
+        
+        // Show loading state
+        sendBtn.textContent = '...'
+        sendBtn.disabled = true
+        
+        try {
+          const res = await fetch(API + '/teachmeback/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: currentSessionId, message })
+          })
+          
+          const data = await res.json()
+          
+          if (res.ok) {
+            // Add AI response
+            addMessage(data.message, 'ai')
+            
+            // Show evaluation feedback if available
+            if (data.evaluation) {
+              let evalEmoji = '⚪'
+              let evalColor = '#6b7280'
+              if (data.evaluation.correctness === 'CORRECT') {
+                evalEmoji = '✅'
+                evalColor = '#10b981'
+              } else if (data.evaluation.correctness === 'INCORRECT') {
+                evalEmoji = '❌'
+                evalColor = '#ef4444'
+              } else if (data.evaluation.correctness === 'PARTIALLY_CORRECT') {
+                evalEmoji = '⚠️'
+                evalColor = '#f59e0b'
+              }
+              
+              let evalMessage = `${evalEmoji} ${data.evaluation.correctness.replace(/_/g, ' ')}`
+              if (data.evaluation.feedback) {
+                evalMessage += `\n💡 ${data.evaluation.feedback}`
+              }
+              
+              addMessage(evalMessage, 'evaluation')
+            }
+            
+            // Show gamification updates
+            if (data.gamification) {
+              updateGamificationDisplay(data.gamification)
+              
+              // Show level up notification
+              if (data.gamification.level_up) {
+                setTimeout(() => {
+                  alert(`🎉 LEVEL UP! You're now a ${data.gamification.level}! Keep up the great work!`)
+                }, 500)
+              }
+              
+              // Show new badges notification
+              if (data.gamification.new_badges && data.gamification.new_badges.length > 0) {
+                data.gamification.new_badges.forEach(badge => {
+                  setTimeout(() => {
+                    alert(`🏆 NEW BADGE UNLOCKED: ${badge.name}!\n${badge.description}`)
+                  }, 1000)
+                })
+              }
+            }
+          } else {
+            addMessage('Error: ' + (data.detail || 'Failed to get response'), 'ai')
+          }
+        } catch (e) {
+          addMessage('Connection error', 'ai')
+        } finally {
+          // Reset button
+          sendBtn.textContent = 'Send'
+          sendBtn.disabled = false
+        }
+      }
+
+      function showStartScreen() {
+        document.getElementById('startScreen').classList.remove('hidden')
+        document.getElementById('chatContainer').classList.remove('active')
+        document.getElementById('gamificationBar').classList.remove('active')
+        currentSessionId = null
+        isSessionActive = false
+        document.getElementById('customTopic').value = ''
+        document.querySelectorAll('.topic-btn').forEach(b => b.classList.remove('selected'))
+      }
+
+      function updateGamificationDisplay(gamification) {
+        const bar = document.getElementById('gamificationBar')
+        bar.classList.add('active')
+        
+        document.getElementById('userLevelDisplay').textContent = gamification.level
+        document.getElementById('userStreak').textContent = gamification.current_streak
+        document.getElementById('userPoints').textContent = gamification.total_points
+        document.getElementById('userBadges').textContent = gamification.new_badges ? gamification.new_badges.length : '0'
+      }
+
+      async function loadUserProgress() {
+        try {
+          const res = await fetch(API + '/teachmeback/progress')
+          if (res.ok) {
+            const data = await res.json()
+            updateGamificationDisplay({
+              level: data.level,
+              current_streak: data.current_streak,
+              total_points: data.points,
+              new_badges: data.badges
+            })
+          }
+        } catch (e) {
+          console.error('Failed to load progress:', e)
+        }
+      }
+
+      // ========== AR WHITEBOARD ==========
+      let arScene, arCamera, arRenderer, arCanvas, arContext, arTexture, arMaterial, arMesh
+      let arControls = null
+      let isDrawing = false
+      let drawColor = '#ffffff'
+      let lastX = 0, lastY = 0
+      let arInitialized = false
+
+      function openWhiteboard() {
+        document.getElementById('arWhiteboard').classList.add('active')
+        if (!arInitialized) {
+          initARWhiteboard()
+        }
+      }
+
+      function closeWhiteboard() {
+        document.getElementById('arWhiteboard').classList.remove('active')
+      }
+
+      function setDrawColor(color, btn) {
+        drawColor = color
+        document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'))
+        btn.classList.add('active')
+      }
+
+      function initARWhiteboard() {
+        arCanvas = document.getElementById('arCanvas')
+        arCanvas.width = window.innerWidth
+        arCanvas.height = window.innerHeight - 80
+
+        // Initialize Three.js scene
+        arScene = new THREE.Scene()
+        arCamera = new THREE.PerspectiveCamera(75, arCanvas.width / arCanvas.height, 0.1, 1000)
+        arRenderer = new THREE.WebGLRenderer({ canvas: arCanvas, alpha: true, antialias: true })
+        arRenderer.setSize(arCanvas.width, arCanvas.height)
+        arRenderer.setClearColor(0x0f172a, 1)
+
+        // Create drawing canvas
+        const drawCanvas = document.createElement('canvas')
+        drawCanvas.width = 1024
+        drawCanvas.height = 1024
+        arContext = drawCanvas.getContext('2d')
+        arContext.fillStyle = '#0f172a'
+        arContext.fillRect(0, 0, 1024, 1024)
+
+        // Create texture from canvas
+        arTexture = new THREE.CanvasTexture(drawCanvas)
+        arTexture.minFilter = THREE.LinearFilter
+        arTexture.magFilter = THREE.LinearFilter
+
+        // Create 3D plane with texture
+        const geometry = new THREE.PlaneGeometry(10, 10)
+        arMaterial = new THREE.MeshBasicMaterial({ 
+          map: arTexture,
+          transparent: true,
+          opacity: 0.95,
+          side: THREE.DoubleSide
+        })
+        arMesh = new THREE.Mesh(geometry, arMaterial)
+        arScene.add(arMesh)
+
+        // Add grid helper
+        const gridHelper = new THREE.GridHelper(20, 20, 0x6366f1, 0x1e293b)
+        gridHelper.position.y = -5
+        arScene.add(gridHelper)
+
+        // Position camera
+        arCamera.position.z = 8
+        arCamera.position.y = 2
+        arCamera.lookAt(0, 0, 0)
+
+        // Add orbit controls for 360-degree rotation (disabled by default)
+        arControls = new THREE.OrbitControls(arCamera, arRenderer.domElement)
+        arControls.enableDamping = true
+        arControls.dampingFactor = 0.05
+        arControls.minDistance = 3
+        arControls.maxDistance = 20
+        arControls.maxPolarAngle = Math.PI / 2
+        arControls.enablePan = true
+        arControls.enabled = false  // DISABLED - click to draw only
+        arControls.mouseButtons = {
+          LEFT: null,  // Disable left click (use for drawing)
+          MIDDLE: THREE.MOUSE.DOLLY,  // Middle click to zoom
+          RIGHT: THREE.MOUSE.ROTATE   // Right click to rotate
+        }
+
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+        arScene.add(ambientLight)
+        const pointLight = new THREE.PointLight(0x6366f1, 1, 100)
+        pointLight.position.set(5, 5, 5)
+        arScene.add(pointLight)
+
+        // Add mouse interaction - use capture phase to intercept before OrbitControls
+        arCanvas.addEventListener('mousedown', startDrawing, true)  // true = capture phase
+        arCanvas.addEventListener('mousemove', draw, true)
+        arCanvas.addEventListener('mouseup', stopDrawing)
+        arCanvas.addEventListener('mouseleave', stopDrawing)
+        arCanvas.addEventListener('touchstart', handleTouchStart, { passive: false })
+        arCanvas.addEventListener('touchmove', handleTouchMove, { passive: false })
+        arCanvas.addEventListener('touchend', stopDrawing)
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+          arCanvas.width = window.innerWidth
+          arCanvas.height = window.innerHeight - 80
+          arCamera.aspect = arCanvas.width / arCanvas.height
+          arCamera.updateProjectionMatrix()
+          arRenderer.setSize(arCanvas.width, arCanvas.height)
+        })
+
+        arInitialized = true
+        animateAR()
+      }
+
+      function animateAR() {
+        if (!document.getElementById('arWhiteboard').classList.contains('active')) return
+        requestAnimationFrame(animateAR)
+        
+        // Update orbit controls
+        if (arControls) arControls.update()
+        
+        // Render scene
+        arRenderer.render(arScene, arCamera)
+      }
+
+      function getARCoordinates(event) {
+        const rect = arCanvas.getBoundingClientRect()
+        const x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+        const y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+        return { x, y }
+      }
+
+      function startDrawing(e) {
+        if (e.button !== 0) return  // Only left click
+        e.preventDefault()
+        e.stopPropagation()
+        isDrawing = true
+        if (arControls) arControls.enabled = false  // Disable orbit while drawing
+        const coords = getARCoordinates(e)
+        lastX = coords.x
+        lastY = coords.y
+        draw(e)
+      }
+
+      function draw(e) {
+        if (!isDrawing) return
+        e.preventDefault()
+        
+        const coords = getARCoordinates(e)
+        
+        // Draw on 2D canvas
+        arContext.strokeStyle = drawColor
+        arContext.lineWidth = 4
+        arContext.lineCap = 'round'
+        arContext.lineJoin = 'round'
+        arContext.shadowBlur = 10
+        arContext.shadowColor = drawColor
+        
+        arContext.beginPath()
+        arContext.moveTo((lastX + 1) * 512, (-lastY + 1) * 512)
+        arContext.lineTo((coords.x + 1) * 512, (-coords.y + 1) * 512)
+        arContext.stroke()
+        
+        // Update texture
+        arTexture.needsUpdate = true
+        
+        lastX = coords.x
+        lastY = coords.y
+      }
+
+      function stopDrawing() {
+        isDrawing = false
+        if (arControls) arControls.enabled = true  // Re-enable orbit controls
+      }
+
+      function handleTouchStart(e) {
+        e.preventDefault()
+        const touch = e.touches[0]
+        const mouseEvent = new MouseEvent('mousedown', {
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        })
+        arCanvas.dispatchEvent(mouseEvent)
+      }
+
+      function handleTouchMove(e) {
+        e.preventDefault()
+        const touch = e.touches[0]
+        const mouseEvent = new MouseEvent('mousemove', {
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        })
+        arCanvas.dispatchEvent(mouseEvent)
+      }
+
+      function clearWhiteboard() {
+        arContext.fillStyle = '#0f172a'
+        arContext.fillRect(0, 0, 1024, 1024)
+        arTexture.needsUpdate = true
+      }
+
+      function saveWhiteboard() {
+        // Convert canvas to base64 image
+        const dataURL = arContext.canvas.toDataURL('image/png')
+        
+        // Add to chat as image message
+        const messages = document.getElementById('messages')
+        const div = document.createElement('div')
+        div.className = 'message user'
+        div.innerHTML = `<img src="${dataURL}" style="max-width:100%;border-radius:12px;" /><p style="margin-top:8px;font-size:12px;">📊 Whiteboard Diagram</p>`
+        messages.appendChild(div)
+        messages.scrollTop = messages.scrollHeight
+        
+        // Close whiteboard
+        closeWhiteboard()
+        
+        // Prompt user to explain their diagram and auto-fill input
+        const diagramPrompt = "I created a diagram on the whiteboard showing " + currentTopic + ". Let me explain what I drew: "
+        const userInput = document.getElementById('userInput')
+        userInput.value = diagramPrompt
+        userInput.focus()
+        
+        // Show notification
+        alert('✅ Whiteboard saved! Now explain your diagram to the AI.')
+      }
+
+      // ========== VOICE INPUT ==========
+      let recognition = null
+      let isRecording = false
+
+      function initVoiceRecognition() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+          recognition = new SpeechRecognition()
+          recognition.continuous = true
+          recognition.interimResults = true
+          recognition.lang = 'en-US'
+          
+          recognition.onstart = function() {
+            isRecording = true
+            document.getElementById('voiceBtn').classList.add('recording')
+            document.getElementById('voiceStatus').classList.add('active')
+          }
+          
+          recognition.onend = function() {
+            isRecording = false
+            document.getElementById('voiceBtn').classList.remove('recording')
+            document.getElementById('voiceStatus').classList.remove('active')
+          }
+          
+          recognition.onresult = function(event) {
+            const input = document.getElementById('userInput')
+            let finalTranscript = ''
+            let interimTranscript = ''
+            
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              const transcript = event.results[i][0].transcript
+              if (event.results[i].isFinal) {
+                finalTranscript += transcript + ' '
+              } else {
+                interimTranscript += transcript
+              }
+            }
+            
+            // Append to existing text
+            if (finalTranscript) {
+              input.value = (input.value + ' ' + finalTranscript).trim()
+              trackTypingSpeed() // Update typing speed tracker
+            }
+            
+            // Show interim results
+            if (interimTranscript && !finalTranscript) {
+              input.placeholder = 'Listening: ' + interimTranscript
+            } else {
+              input.placeholder = 'Explain the concept to your AI student...'
+            }
+          }
+          
+          recognition.onerror = function(event) {
+            console.error('Speech recognition error:', event.error)
+            if (event.error === 'not-allowed') {
+              alert('Microphone access denied. Please allow microphone access to use voice input.')
+            }
+            stopVoiceRecording()
+          }
+          
+          return true
+        } else {
+          alert('Voice input is not supported in your browser. Please use Chrome, Edge, or Safari.')
+          return false
+        }
+      }
+
+      function toggleVoiceInput() {
+        if (!recognition) {
+          if (!initVoiceRecognition()) return
+        }
+        
+        if (isRecording) {
+          stopVoiceRecording()
+        } else {
+          startVoiceRecording()
+        }
+      }
+
+      function startVoiceRecording() {
+        try {
+          recognition.start()
+        } catch (e) {
+          console.error('Failed to start voice recording:', e)
+        }
+      }
+
+      function stopVoiceRecording() {
+        try {
+          recognition.stop()
+        } catch (e) {
+          console.error('Failed to stop voice recording:', e)
+        }
+        document.getElementById('voiceStatus').classList.remove('active')
+        document.getElementById('voiceBtn').classList.remove('recording')
+        document.getElementById('userInput').placeholder = 'Explain the concept to your AI student...'
+      }
+
+      // ========== KNOWLEDGE GRAPH FUNCTIONS ==========
+      let kgData = {concepts: [], relationships: []}
+      let kgSimulation = null
+
+      function toggleKnowledgeGraph() {
+        const container = document.getElementById('kgContainer')
+        const btn = document.querySelector('.kg-toggle-btn')
+        if (container.classList.contains('active')) {
+          container.classList.remove('active')
+          btn.textContent = 'Show'
+        } else {
+          container.classList.add('active')
+          btn.textContent = 'Hide'
+          renderKnowledgeGraph()
+        }
+      }
+
+      async function extractConceptsFromMessage(message) {
+        if (!currentSessionId) return
+        
+        try {
+          const res = await fetch(API + '/teachmeback/knowledge-graph/' + currentSessionId + '/extract', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: message})
+          })
+          
+          if (res.ok) {
+            const data = await res.json()
+            kgData = data.graph
+            if (document.getElementById('kgContainer').classList.contains('active')) {
+              renderKnowledgeGraph()
+            }
+          }
+        } catch (e) {
+          console.error('Failed to extract concepts:', e)
+        }
+      }
+
+      async function loadKnowledgeGraph() {
+        if (!currentSessionId) return
+        
+        try {
+          const res = await fetch(API + '/teachmeback/knowledge-graph/' + currentSessionId)
+          if (res.ok) {
+            const data = await res.json()
+            kgData = data
+            if (document.getElementById('kgContainer').classList.contains('active')) {
+              renderKnowledgeGraph()
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load knowledge graph:', e)
+        }
+      }
+
+      function renderKnowledgeGraph() {
+        const container = document.getElementById('kgGraph')
+        container.innerHTML = ''
+        
+        if (kgData.concepts.length === 0) {
+          container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);">Start teaching to build your knowledge graph!</div>'
+          return
+        }
+        
+        const width = container.clientWidth
+        const height = container.clientHeight
+        
+        const svg = d3.select('#kgGraph')
+          .append('svg')
+          .attr('width', width)
+          .attr('height', height)
+          .attr('viewBox', [0, 0, width, height])
+          .style('max-width', '100%')
+          .style('height', 'auto')
+        
+        // Add zoom behavior
+        const g = svg.append('g')
+        
+        svg.call(d3.zoom()
+          .extent([[0, 0], [width, height]])
+          .scaleExtent([0.5, 4])
+          .on('zoom', (event) => {
+            g.attr('transform', event.transform)
+          }))
+        
+        // Prepare nodes and links
+        const nodes = kgData.concepts.map(c => ({
+          id: c.id,
+          name: c.name,
+          description: c.description,
+          mastery: c.mastery || 0.5,
+          radius: 20 + (c.mastery || 0.5) * 15
+        }))
+        
+        const links = kgData.relationships.map(r => ({
+          source: r.source,
+          target: r.target,
+          type: r.type
+        }))
+        
+        // Color scale based on mastery
+        const colorScale = d3.scaleLinear()
+          .domain([0, 0.5, 1])
+          .range(['#6366f1', '#f59e0b', '#10b981'])
+        
+        // Create force simulation
+        kgSimulation = d3.forceSimulation(nodes)
+          .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+          .force('charge', d3.forceManyBody().strength(-300))
+          .force('center', d3.forceCenter(width / 2, height / 2))
+          .force('collision', d3.forceCollide().radius(d => d.radius + 10))
+        
+        // Draw links
+        const link = g.append('g')
+          .attr('stroke', 'rgba(255,255,255,0.2)')
+          .attr('stroke-opacity', 0.6)
+          .selectAll('line')
+          .data(links)
+          .join('line')
+          .attr('stroke-width', 2)
+        
+        // Draw link labels
+        const linkLabel = g.append('g')
+          .selectAll('text')
+          .data(links)
+          .join('text')
+          .attr('class', 'link-label')
+          .text(d => d.type.replace(/_/g, ' '))
+          .attr('font-size', 9)
+          .attr('text-anchor', 'middle')
+          .attr('fill', 'var(--text-secondary)')
+        
+        // Draw nodes
+        const node = g.append('g')
+          .selectAll('g')
+          .data(nodes)
+          .join('g')
+          .call(d3.drag()
+            .on('start', (event, d) => {
+              if (!event.active) kgSimulation.alphaTarget(0.3).restart()
+              d.fx = d.x
+              d.fy = d.y
+            })
+            .on('drag', (event, d) => {
+              d.fx = event.x
+              d.fy = event.y
+            })
+            .on('end', (event, d) => {
+              if (!event.active) kgSimulation.alphaTarget(0)
+              d.fx = null
+              d.fy = null
+            }))
+        
+        // Node circles
+        node.append('circle')
+          .attr('r', d => d.radius)
+          .attr('fill', d => colorScale(d.mastery))
+          .attr('stroke', 'rgba(255,255,255,0.3)')
+          .attr('stroke-width', 2)
+          .style('cursor', 'pointer')
+          .on('mouseover', function(event, d) {
+            d3.select(this).attr('stroke', 'white').attr('stroke-width', 3)
+          })
+          .on('mouseout', function(event, d) {
+            d3.select(this).attr('stroke', 'rgba(255,255,255,0.3)').attr('stroke-width', 2)
+          })
+        
+        // Node labels
+        node.append('text')
+          .attr('class', 'node-label')
+          .text(d => d.name)
+          .attr('text-anchor', 'middle')
+          .attr('dy', d => d.radius + 15)
+          .attr('font-size', 11)
+        
+        // Update positions on tick
+        kgSimulation.on('tick', () => {
+          link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y)
+          
+          linkLabel
+            .attr('x', d => (d.source.x + d.target.x) / 2)
+            .attr('y', d => (d.source.y + d.target.y) / 2)
+          
+          node.attr('transform', d => `translate(${d.x},${d.y})`)
+        })
+      }
+
+      // ========== TYPING SPEED TRACKER FUNCTIONS ==========
+      function updateTypingDisplay() {
+        // Calculate average WPM
+        const avgWPM = typingMeasurements.length > 0 
+          ? Math.round(typingMeasurements.reduce((a, b) => a + b, 0) / typingMeasurements.length)
+          : 0
+        
+        // Update display
+        document.getElementById('avgWPM').textContent = avgWPM
+        document.getElementById('bestWPM').textContent = bestWPM
+      }
+
+      function resetTypingTracker() {
+        typingStartTime = null
+        typingCharCount = 0
+        isTyping = false
+        clearTimeout(typingTimeout)
+        document.getElementById('typingIndicator').style.display = 'none'
+        document.getElementById('currentWPM').textContent = '0'
+      }
+
+      function trackTypingSpeed() {
+        const input = document.getElementById('userInput')
+        const text = input.value
+        
+        // Start timer on first keystroke
+        if (!typingStartTime && text.length > 0) {
+          typingStartTime = Date.now()
+        }
+        
+        // Update character count
+        typingCharCount = text.length
+        
+        // Show typing indicator
+        if (text.length > 0) {
+          document.getElementById('typingIndicator').style.display = 'block'
+          isTyping = true
+          
+          // Clear previous timeout
+          clearTimeout(typingTimeout)
+          
+          // Hide indicator after 1 second of no typing
+          typingTimeout = setTimeout(() => {
+            document.getElementById('typingIndicator').style.display = 'none'
+            isTyping = false
+          }, 1000)
+          
+          // Calculate current WPM in real-time
+          if (typingStartTime) {
+            const duration = (Date.now() - typingStartTime) / 60000 // minutes
+            const words = text.split(/\s+/).filter(w => w.length > 0).length
+            const currentWPM = duration > 0 ? Math.round(words / duration) : 0
+            document.getElementById('currentWPM').textContent = currentWPM
+          }
+        } else {
+          document.getElementById('typingIndicator').style.display = 'none'
+          document.getElementById('currentWPM').textContent = '0'
+        }
+      }
+
+      // Add event listener for typing
+      document.addEventListener('DOMContentLoaded', function() {
+        const userInput = document.getElementById('userInput')
+        if (userInput) {
+          userInput.addEventListener('input', trackTypingSpeed)
+        }
+      })
+
+      init()
+    </script>
+  </body>
+</html>
