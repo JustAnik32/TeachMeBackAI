@@ -26,7 +26,7 @@ ADMIN_CODE = os.environ.get('MICROCLINIC_ADMIN_CODE', 'adminpass')
 # AI Configuration
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
-OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'openai/gpt-4o-mini')
+OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'openai/gpt-4o')
 
 
 def call_openrouter(system_prompt: str, user_prompt: str, max_tokens: int = 300) -> str:
@@ -55,7 +55,11 @@ def call_openrouter(system_prompt: str, user_prompt: str, max_tokens: int = 300)
         timeout=30
     )
     if response.status_code != 200:
-        raise HTTPException(status_code=500, detail=f"OpenRouter error: {response.text}")
+        error_text = response.text
+        # Handle image-related errors gracefully
+        if "image" in error_text.lower() and "does not support" in error_text.lower():
+            raise HTTPException(status_code=400, detail=f"Selected AI model ({OPENROUTER_MODEL}) does not support image input. Please use a vision-capable model like 'openai/gpt-4o' or 'anthropic/claude-3-haiku'.")
+        raise HTTPException(status_code=500, detail=f"OpenRouter error: {error_text}")
     return response.json()['choices'][0]['message']['content']
 
 
