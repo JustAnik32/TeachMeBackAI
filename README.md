@@ -19,6 +19,12 @@ TeachMeBack is an AI learning platform where students teach concepts to an AI st
 
 ## ✨ Features
 
+- **Multi-Agent Teaching System**: Choose from 5 AI teaching personas:
+  - 🎓 **Curious Student**: Enthusiastic beginner asking questions
+  - 🎯 **Expert Reviewer**: Challenges assumptions, tests deeper understanding
+  - 🧠 **Socratic Guide**: Uses questioning to guide self-discovery
+  - 👥 **Peer Learner**: Collaborative learning with fellow student
+  - ❓ **Quiz Master**: Fun, quiz-style knowledge testing
 - **AI Socratic Method**: AI plays curious student, asks probing questions
 - **Plagiarism Detection**: Prevents copying AI responses
 - **Tab Switch Monitoring**: Ensures focus during teaching
