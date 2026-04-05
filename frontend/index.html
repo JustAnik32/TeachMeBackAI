@@ -43,13 +43,8 @@
     </div>
 
     <script>
-      // Redirect based on authentication status
-      const authToken = localStorage.getItem('authToken')
-      if (authToken) {
-        window.location.href = 'app.html'
-      } else {
-        window.location.href = 'login.html'
-      }
+      // No auth required - go straight to app
+      window.location.href = 'app.html'
     </script>
   </body>
 </html>
