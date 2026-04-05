@@ -43,7 +43,12 @@ uvicorn app.main:app --reload
 ```
 
 ### Frontend
-Open `frontend/teachmeback.html` in browser
+Open `frontend/index.html` in browser (automatically redirects to appropriate page)
+
+#### Page Structure
+- `index.html` - Entry point (redirects based on auth status)
+- `login.html` - Authentication screen (login/register)
+- `app.html` - Main application (topic selection + teaching interface)
 
 ## 🔧 Tech Stack
 
