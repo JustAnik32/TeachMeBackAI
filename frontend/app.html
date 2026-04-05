@@ -207,64 +207,8 @@
           document.getElementById('agentDescription').innerHTML = agentDescriptions[currentAgent]
         })
 
-        // Check authentication
-        if (!authToken) {
-          window.location.href = 'login.html'
-          return
-        }
-
-        // Verify token and show app
-        verifyToken()
-      }
-
-      async function verifyToken() {
-        try {
-          const res = await fetch(API + '/me', {
-            headers: { 'Authorization': 'Bearer ' + authToken }
-          })
-
-          if (res.ok) {
-            const data = await res.json()
-            currentUser = data
-            document.getElementById('userInfo').style.display = 'flex'
-            document.getElementById('userName').textContent = currentUser.name
-            document.getElementById('backBtn').style.display = 'block'
-            showStartScreen()
-          } else {
-            localStorage.removeItem('authToken')
-            window.location.href = 'login.html'
-          }
-        } catch (e) {
-          localStorage.removeItem('authToken')
-          window.location.href = 'login.html'
-        }
-      }
-
-        // Verify token and show app
-        verifyToken()
-      }
-
-      async function verifyToken() {
-        try {
-          const res = await fetch(API + '/me', {
-            headers: { 'Authorization': 'Bearer ' + authToken }
-          })
-
-          if (res.ok) {
-            const data = await res.json()
-            currentUser = data
-            document.getElementById('userInfo').style.display = 'flex'
-            document.getElementById('userName').textContent = currentUser.name
-            document.getElementById('backBtn').style.display = 'block'
-            showStartScreen()
-          } else {
-            localStorage.removeItem('authToken')
-            window.location.href = 'login.html'
-          }
-        } catch (e) {
-          localStorage.removeItem('authToken')
-          window.location.href = 'login.html'
-        }
+        // No auth required - show app immediately
+        showStartScreen()
       }
 
       function showStartScreen() {
