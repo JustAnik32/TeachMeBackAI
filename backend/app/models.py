@@ -11,10 +11,15 @@ class User(Base):
     phone = Column(String, unique=True, index=True, nullable=True)
     name = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
+    token = Column(String, nullable=True)  # For session tokens
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # For email verification (optional)
     is_verified = Column(Boolean, default=False)
     verification_token = Column(String, nullable=True)
+
+    # For Google Sign-In
+    google_id = Column(String, unique=True, index=True, nullable=True)
+    profile_picture = Column(String, nullable=True)

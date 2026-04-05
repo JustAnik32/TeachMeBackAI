@@ -135,12 +135,28 @@ def get_user_by_phone(phone: str):
 
 
 def get_user_by_token(token: str):
+    from .database import get_db
+    from . import models
+    from sqlalchemy.orm import Session
+
     if not token:
         return None
-    for u in _load_users():
-        if u.get('token') == token:
-            return u
-    return None
+
+    db = next(get_db())
+    try:
+        user = db.query(models.User).filter(models.User.token == token).first()
+        if user:
+            return {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'token': user.token,
+                'is_admin': user.is_admin
+            }
+        return None
+    finally:
+        db.close()
 
 
 def verify_user_credentials(phone: str, password: str):

@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>TeachMeBack — Learn by Teaching</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
       :root{
         --bg:#f6f9fc; --card:#ffffff; --muted:#6b7280; --accent1:#5b8cff; --accent2:#7b61ff; --danger:#ef4444; --warn:#f59e0b; --ok:#10b981;
@@ -132,6 +133,10 @@
               Already have an account? <a onclick="showLogin()">Sign in</a>
             </div>
           </div>
+
+          <div style="text-align:center;margin:20px 0;color:#6b7280;font-size:14px">or</div>
+
+          <div id="googleSignInBtn" style="text-align:center"></div>
         </div>
       </div>
 
@@ -173,8 +178,6 @@
         
         <button class="back-btn" id="chatBackBtn" onclick="showStartScreen()" style="background:linear-gradient(90deg,var(--accent1),var(--accent2));border:none;margin-bottom:12px">← New Session</button>
         
-        <button class="back-btn" id="chatBackBtn" onclick="showStartScreen()" style="background:linear-gradient(90deg,var(--accent1),var(--accent2));border:none;margin-bottom:12px">← New Session</button>
-        
         <div class="topic-display" id="topicDisplay"></div>
         
         <div class="messages" id="messages"></div>
@@ -196,13 +199,14 @@
     </footer>
 
     <script>
-      // Production API URL - update this after deploying backend to Render
-      const API = window.location.hostname === 'localhost' 
+      const API = window.location.hostname === 'localhost'
         ? 'http://localhost:8000/api'
         : 'https://teachmebackai-oifm.onrender.com/api'
-      
+
       let currentSessionId = null
       let currentTopic = ''
+      let authToken = localStorage.getItem('authToken') || null
+      let currentUser = null
 
       const topics = [
         "Photosynthesis",
@@ -228,6 +232,226 @@
           }
           grid.appendChild(btn)
         })
+
+        // Initialize Google Sign-In
+        initGoogleSignIn()
+
+        if (authToken) {
+          verifyToken()
+        } else {
+          showAuthScreen()
+        }
+      }
+
+      async function initGoogleSignIn() {
+        try {
+          const res = await fetch(API + '/google-client-id')
+          const data = await res.json()
+          if (res.ok && data.client_id) {
+            // Google Sign-In will be initialized when the library loads
+            window.addEventListener('load', () => {
+              if (window.google && window.google.accounts) {
+                window.google.accounts.id.initialize({
+                  client_id: data.client_id,
+                  callback: handleGoogleSignIn
+                })
+                window.google.accounts.id.renderButton(
+                  document.getElementById('googleSignInBtn'),
+                  {
+                    theme: 'outline',
+                    size: 'large',
+                    text: 'continue_with',
+                    shape: 'rectangular',
+                    width: 300
+                  }
+                )
+              }
+            })
+          } else {
+            console.log('Google Client ID not configured')
+          }
+        } catch (e) {
+          console.log('Failed to fetch Google Client ID:', e)
+        }
+      }
+
+      async function handleGoogleSignIn(response) {
+        try {
+          const res = await fetch(API + '/google-signin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ credential: response.credential })
+          })
+
+          const data = await res.json()
+
+          if (res.ok) {
+            authToken = data.token
+            currentUser = { name: data.name, id: data.id, email: data.email }
+            localStorage.setItem('authToken', authToken)
+            showMainApp()
+          } else {
+            showAuthError(data.detail || 'Google sign-in failed')
+          }
+        } catch (e) {
+          showAuthError('Cannot connect to server')
+        }
+      }
+
+      async function verifyToken() {
+        try {
+          const res = await fetch(API + '/me', {
+            headers: { 'Authorization': 'Bearer ' + authToken }
+          })
+
+          if (res.ok) {
+            const data = await res.json()
+            currentUser = data
+            showMainApp(data.name)
+          } else {
+            localStorage.removeItem('authToken')
+            authToken = null
+            showAuthScreen()
+          }
+        } catch (e) {
+          localStorage.removeItem('authToken')
+          authToken = null
+          showAuthScreen()
+        }
+      }
+
+      function showAuthScreen() {
+        document.getElementById('authScreen').classList.remove('hidden')
+        document.getElementById('startScreen').classList.add('hidden')
+        document.getElementById('chatContainer').classList.remove('active')
+        document.getElementById('userInfo').style.display = 'none'
+        document.getElementById('backBtn').style.display = 'none'
+      }
+
+      function showMainApp(userName) {
+        document.getElementById('authScreen').classList.add('hidden')
+        document.getElementById('startScreen').classList.remove('hidden')
+        document.getElementById('userInfo').style.display = 'flex'
+        document.getElementById('userName').textContent = userName || currentUser?.name || 'User'
+        document.getElementById('backBtn').style.display = 'block'
+        showStartScreen()
+      }
+
+      function showLogin() {
+        document.getElementById('loginForm').style.display = 'block'
+        document.getElementById('registerForm').style.display = 'none'
+        document.getElementById('authTitle').textContent = 'Welcome Back'
+        document.getElementById('authSubtitle').textContent = 'Sign in to continue learning'
+        hideAuthError()
+      }
+
+      function showRegister() {
+        document.getElementById('loginForm').style.display = 'none'
+        document.getElementById('registerForm').style.display = 'block'
+        document.getElementById('authTitle').textContent = 'Create Account'
+        document.getElementById('authSubtitle').textContent = 'Sign up to start learning'
+        hideAuthError()
+      }
+
+      function showAuthError(message) {
+        const errorEl = document.getElementById('authError')
+        errorEl.textContent = message
+        errorEl.classList.add('show')
+      }
+
+      function hideAuthError() {
+        document.getElementById('authError').classList.remove('show')
+      }
+
+      async function handleLogin() {
+        const emailOrPhone = document.getElementById('loginEmail').value.trim()
+        const password = document.getElementById('loginPassword').value
+
+        if (!emailOrPhone || !password) {
+          showAuthError('Please fill in all fields')
+          return
+        }
+
+        const loginBtn = document.querySelector('#loginForm .auth-btn')
+        loginBtn.textContent = 'Signing in...'
+        loginBtn.disabled = true
+
+        try {
+          const res = await fetch(API + '/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email_or_phone: emailOrPhone, password })
+          })
+
+          const data = await res.json()
+
+          if (res.ok) {
+            authToken = data.token
+            currentUser = { name: data.name, id: data.id }
+            localStorage.setItem('authToken', authToken)
+            showMainApp()
+          } else {
+            showAuthError(data.detail || 'Login failed')
+          }
+        } catch (e) {
+          showAuthError('Cannot connect to server')
+        } finally {
+          loginBtn.textContent = 'Sign In'
+          loginBtn.disabled = false
+        }
+      }
+
+      async function handleRegister() {
+        const name = document.getElementById('registerName').value.trim()
+        const email = document.getElementById('registerEmail').value.trim()
+        const phone = document.getElementById('registerPhone').value.trim()
+        const password = document.getElementById('registerPassword').value
+        const adminCode = document.getElementById('adminCode').value.trim()
+
+        if (!name || !email || !password) {
+          showAuthError('Name, email, and password are required')
+          return
+        }
+
+        if (password.length < 6) {
+          showAuthError('Password must be at least 6 characters')
+          return
+        }
+
+        const registerBtn = document.querySelector('#registerForm .auth-btn')
+        registerBtn.textContent = 'Creating account...'
+        registerBtn.disabled = true
+
+        try {
+          const res = await fetch(API + '/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, phone, password, admin_code: adminCode || undefined })
+          })
+
+          const data = await res.json()
+
+          if (res.ok) {
+            authToken = data.token
+            currentUser = { name: data.name, id: data.id }
+            localStorage.setItem('authToken', authToken)
+            showMainApp()
+          } else {
+            showAuthError(data.detail || 'Registration failed')
+          }
+        } catch (e) {
+          showAuthError('Cannot connect to server')
+        } finally {
+          registerBtn.textContent = 'Create Account'
+          registerBtn.disabled = false
+        }
+      }
+
+      function logout() {
+        authToken = null
+        currentUser = null
+        localStorage.removeItem('authToken')
+        showAuthScreen()
       }
 
       // Authentication functions
@@ -460,7 +684,10 @@
         try {
           const res = await fetch(API + '/teachmeback/start', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + authToken
+            },
             body: JSON.stringify({ topic, user_level: level })
           })
           
@@ -497,21 +724,24 @@
       async function sendMessage() {
         const input = document.getElementById('userInput')
         const message = input.value.trim()
-        
+
         if (!message || !currentSessionId) return
-        
+
         addMessage(message, 'user')
         input.value = ''
-        
+
         try {
           const res = await fetch(API + '/teachmeback/chat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + authToken
+            },
             body: JSON.stringify({ session_id: currentSessionId, message })
           })
-          
+
           const data = await res.json()
-          
+
           if (res.ok) {
             addMessage(data.message, 'ai')
           } else {

@@ -28,6 +28,9 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'openai/gpt-4o')
 
+# Google Sign-In Configuration
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+
 
 def call_openrouter(system_prompt: str, user_prompt: str, max_tokens: int = 300) -> str:
     """Make API call using OpenRouter"""
@@ -182,6 +185,11 @@ class LoginIn(BaseModel):
     email_or_phone: str
     password: str
 
+
+class GoogleSignInIn(BaseModel):
+    credential: str
+
+
 app = FastAPI(title="MicroClinic MVP")
 
 app.add_middleware(
@@ -335,13 +343,71 @@ def register(payload: RegisterIn, db: Session = Depends(database.get_db)):
     # Create session token
     import uuid
     token = uuid.uuid4().hex
-    
-    # Store token in user record (simplified approach)
-    # In production, you'd use a separate tokens table or JWT
-    db_user.hashed_password = db_user.hashed_password + f":{token}"  # Simple token storage
+
+    # Store token in user record
+    db_user.token = token
     db.commit()
     
     return {'token': token, 'name': db_user.name, 'id': db_user.id}
+
+
+@app.post('/api/google-signin')
+def google_signin(payload: GoogleSignInIn, db: Session = Depends(database.get_db)):
+    """Google Sign-In endpoint"""
+    try:
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as google_requests
+        
+        # Verify the Google ID token
+        idinfo = id_token.verify_oauth2_token(
+            payload.credential,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+        
+        # Get user info from the token
+        email = idinfo['email']
+        name = idinfo.get('name', email.split('@')[0])
+        picture = idinfo.get('picture', '')
+        
+        # Check if user already exists
+        user = db.query(models.User).filter(models.User.email == email).first()
+        
+        if not user:
+            # Create new user from Google account
+            import uuid
+            # Generate a random password for Google users (they won't use it)
+            random_password = uuid.uuid4().hex
+            from passlib.context import CryptContext
+            pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+            hashed_password = pwd_context.hash(random_password)
+            
+            user = models.User(
+                email=email,
+                name=name,
+                hashed_password=hashed_password,
+                google_id=idinfo.get('sub'),
+                profile_picture=picture,
+                is_admin=False
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        
+        # Generate session token
+        import uuid
+        token = uuid.uuid4().hex
+
+        # Store token
+        user.token = token
+        db.commit()
+        
+        return {'token': token, 'name': user.name, 'id': user.id, 'email': user.email}
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f'Invalid Google token: {str(e)}')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Google sign-in error: {str(e)}')
 
 
 @app.post('/api/login')
@@ -358,21 +424,16 @@ def login(payload: LoginIn, db: Session = Depends(database.get_db)):
     # Verify password
     from passlib.context import CryptContext
     pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-    
-    # Extract password hash (handle token storage format)
-    stored_hash = user.hashed_password
-    if ":" in stored_hash:
-        stored_hash = stored_hash.split(":")[0]  # Remove token if present
-    
-    if not pwd_context.verify(payload.password, stored_hash):
+
+    if not pwd_context.verify(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail='Invalid credentials')
-    
+
     # Generate new token
     import uuid
     token = uuid.uuid4().hex
-    
-    # Store token with password (simple approach)
-    user.hashed_password = f"{stored_hash}:{token}"
+
+    # Store token
+    user.token = token
     db.commit()
     
     return {'token': token, 'name': user.name, 'id': user.id}
@@ -387,6 +448,14 @@ def me(authorization: Optional[str] = Header(None)):
     if not user:
         raise HTTPException(status_code=401, detail='Invalid token')
     return {'id': user.get('id'), 'name': user.get('name'), 'phone': user.get('phone')}
+
+
+@app.get('/api/google-client-id')
+def get_google_client_id():
+    """Get Google Client ID for frontend Google Sign-In"""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Google Client ID not configured")
+    return {'client_id': GOOGLE_CLIENT_ID}
 
 
 # TeachMeBack AI Learning Platform Endpoints
@@ -408,8 +477,16 @@ class TeachMeBackFeedbackIn(BaseModel):
 
 
 @app.post('/api/teachmeback/start')
-def start_teachmeback_session(payload: TeachMeBackSessionIn):
+def start_teachmeback_session(payload: TeachMeBackSessionIn, authorization: Optional[str] = Header(None)):
     """Start a new teaching session where user explains a concept to AI"""
+    # Authentication: require token
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+
     if not OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
 
@@ -462,8 +539,16 @@ After the user responds, react to what they say, show excitement when you unders
 
 
 @app.post('/api/teachmeback/chat')
-def chat_teachmeback(payload: TeachMeBackMessageIn):
+def chat_teachmeback(payload: TeachMeBackMessageIn, authorization: Optional[str] = Header(None)):
     """Continue a teaching session with a new message from the user"""
+    # Authentication: require token
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+
     if not OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="OpenRouter API key not configured")
 
@@ -601,8 +686,16 @@ Keep responses conversational and at {session['user_level']} level."""
 
 
 @app.post('/api/teachmeback/feedback')
-def provide_feedback(payload: TeachMeBackFeedbackIn):
+def provide_feedback(payload: TeachMeBackFeedbackIn, authorization: Optional[str] = Header(None)):
     """User provides feedback on AI's understanding"""
+    # Authentication: require token
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+
     session = data_store.get_teachmeback_session(payload.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -620,8 +713,16 @@ def provide_feedback(payload: TeachMeBackFeedbackIn):
 
 
 @app.get('/api/teachmeback/session/{session_id}')
-def get_session_summary(session_id: str):
+def get_session_summary(session_id: str, authorization: Optional[str] = Header(None)):
     """Get a summary of the teaching session including identified gaps"""
+    # Authentication: require token
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+
     session = data_store.get_teachmeback_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -636,8 +737,15 @@ def get_session_summary(session_id: str):
 
 
 @app.get('/api/teachmeback/topics')
-def get_topic_suggestions():
+def get_topic_suggestions(authorization: Optional[str] = Header(None)):
     """Get suggested topics for teaching"""
+    # Authentication: require token
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
     return {
         'topics': [
             "Photosynthesis",
@@ -655,12 +763,20 @@ def get_topic_suggestions():
 
 
 @app.get('/api/teachmeback/progress')
-def get_user_progress_endpoint(user_id: str = 'anonymous'):
+def get_user_progress_endpoint(authorization: Optional[str] = Header(None)):
     """Get user's gamification progress (points, badges, level, streaks)"""
+    # Authentication: require token
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+
     try:
-        progress = data_store.get_user_progress(user_id)
+        progress = data_store.get_user_progress(user['id'])
         return {
-            'user_id': user_id,
+            'user_id': user['id'],
             'points': progress['points'],
             'total_points_earned': progress['total_points_earned'],
             'level': progress['level'],
@@ -677,15 +793,31 @@ def get_user_progress_endpoint(user_id: str = 'anonymous'):
 
 
 @app.get('/api/teachmeback/knowledge-graph/{session_id}')
-def get_knowledge_graph(session_id: str):
+def get_knowledge_graph(session_id: str, authorization: Optional[str] = Header(None)):
     """Get knowledge graph for a session"""
+    # Authentication: require token
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+
     graph = data_store.get_session_knowledge_graph(session_id)
     return graph
 
 
 @app.post('/api/teachmeback/knowledge-graph/{session_id}/extract')
-def extract_concepts(session_id: str, payload: dict):
+def extract_concepts(session_id: str, payload: dict, authorization: Optional[str] = Header(None)):
     """Extract concepts and relationships from user message"""
+    # Authentication: require token
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+
     session = data_store.get_teachmeback_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -744,3 +876,673 @@ Only include concepts actually mentioned in the message. Use lowercase snake_cas
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error extracting concepts: {str(e)}")
+
+
+# ========== NEW API ENDPOINTS ==========
+
+class AppointmentIn(BaseModel):
+    user_id: str
+    patient_id: Optional[str] = None
+    date: str
+    time: str
+    doctor_name: str
+    notes: Optional[str] = None
+
+class PrescriptionIn(BaseModel):
+    patient_id: str
+    doctor_name: str
+    medications: List[dict]
+    notes: Optional[str] = None
+
+class MedicalRecordIn(BaseModel):
+    patient_id: str
+    record_type: str
+    content: dict
+    notes: Optional[str] = None
+
+
+@app.post('/api/appointments')
+def create_appointment(payload: AppointmentIn, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    try:
+        appt_data = payload.dict()
+        appt_data['created_by'] = user['id']
+        appt_id = data_store.save_appointment(appt_data)
+        return {'id': appt_id, 'status': 'scheduled'}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating appointment: {str(e)}")
+
+@app.get('/api/appointments')
+def list_appointments(
+    status: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.get_appointments(user_id=user['id'], status=status, page=page, page_size=page_size)
+
+@app.put('/api/appointments/{appointment_id}')
+def update_appointment_endpoint(appointment_id: str, updates: dict, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    if not data_store.update_appointment(appointment_id, updates):
+        raise HTTPException(status_code=404, detail='Appointment not found')
+    return {'ok': True}
+
+@app.delete('/api/appointments/{appointment_id}')
+def cancel_appointment_endpoint(appointment_id: str, reason: str = '', authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    if not data_store.cancel_appointment(appointment_id, reason):
+        raise HTTPException(status_code=404, detail='Appointment not found')
+    return {'ok': True, 'status': 'cancelled'}
+
+
+@app.post('/api/prescriptions')
+def create_prescription(payload: PrescriptionIn, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    try:
+        rx_data = payload.dict()
+        rx_data['prescribed_by'] = user['id']
+        rx_id = data_store.save_prescription(rx_data)
+        return {'id': rx_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating prescription: {str(e)}")
+
+@app.get('/api/prescriptions')
+def list_prescriptions(
+    is_active: Optional[bool] = None,
+    page: int = 1,
+    page_size: int = 20,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.get_prescriptions(patient_id=user['id'], is_active=is_active, page=page, page_size=page_size)
+
+@app.delete('/api/prescriptions/{prescription_id}')
+def deactivate_prescription_endpoint(prescription_id: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    if not data_store.deactivate_prescription(prescription_id):
+        raise HTTPException(status_code=404, detail='Prescription not found')
+    return {'ok': True, 'status': 'deactivated'}
+
+
+@app.post('/api/medical-records')
+def create_medical_record(payload: MedicalRecordIn, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    try:
+        record_data = payload.dict()
+        record_data['created_by'] = user['id']
+        record_id = data_store.save_medical_record(record_data)
+        return {'id': record_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating medical record: {str(e)}")
+
+@app.get('/api/medical-records')
+def list_medical_records(
+    record_type: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.get_medical_records(patient_id=user['id'], record_type=record_type, page=page, page_size=page_size)
+
+
+@app.get('/api/search/cases')
+def search_cases_endpoint(
+    q: str,
+    severity: Optional[str] = None,
+    status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    filters = {}
+    if severity:
+        filters['severity'] = severity
+    if status:
+        filters['status'] = status
+    if date_from:
+        filters['date_from'] = date_from
+    if date_to:
+        filters['date_to'] = date_to
+    return data_store.search_cases(q, filters=filters, page=page, page_size=page_size)
+
+@app.get('/api/search/users')
+def search_users_endpoint(
+    q: str,
+    page: int = 1,
+    page_size: int = 20,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.search_users(q, page=page, page_size=page_size)
+
+
+@app.get('/api/audit-logs')
+def get_audit_logs_endpoint(
+    event_type: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.get_audit_logs(event_type=event_type, user_id=user['id'], start_date=start_date, end_date=end_date, page=page, page_size=page_size)
+
+
+@app.post('/api/backup/create')
+def create_backup_endpoint(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    try:
+        archive_path = data_store.create_backup()
+        return {'backup_path': archive_path, 'status': 'created'}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating backup: {str(e)}")
+
+@app.get('/api/backup/list')
+def list_backups_endpoint(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.list_backups()
+
+@app.post('/api/backup/restore')
+def restore_backup_endpoint(archive_path: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    if not data_store.restore_backup(archive_path):
+        raise HTTPException(status_code=404, detail='Backup file not found')
+    return {'ok': True, 'status': 'restored'}
+
+
+@app.get('/api/stats')
+def get_data_stats_endpoint(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.get_data_stats()
+
+
+@app.post('/api/soft-delete/{entity_type}/{entity_id}')
+def soft_delete_endpoint(entity_type: str, entity_id: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    data_store.soft_delete(entity_type, entity_id, deleted_by=user['id'])
+    return {'ok': True, 'status': 'deleted'}
+
+@app.post('/api/soft-delete/restore/{entity_type}/{entity_id}')
+def restore_soft_delete_endpoint(entity_type: str, entity_id: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    if not data_store.restore_soft_delete(entity_type, entity_id):
+        raise HTTPException(status_code=404, detail='Soft delete record not found')
+    return {'ok': True, 'status': 'restored'}
+
+
+@app.post('/api/migrate/add-default-fields')
+def migrate_add_default_fields_endpoint(entity_type: str, defaults: dict, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.migrate_add_default_fields(entity_type, defaults)
+
+@app.post('/api/migrate/remove-orphaned-records')
+def migrate_remove_orphaned_records_endpoint(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.migrate_remove_orphaned_records()
+
+
+@app.get('/api/export/{entity_type}')
+def export_to_csv_endpoint(entity_type: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    try:
+        data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
+        output_path = os.path.join(data_dir, f"{entity_type}_export.csv")
+        path = data_store.export_to_csv(entity_type, output_path)
+        return {'export_path': path, 'status': 'exported'}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exporting data: {str(e)}")
+
+
+# ========== NEW API ENDPOINTS ==========
+
+class AppointmentIn(BaseModel):
+    user_id: str
+    patient_id: Optional[str] = None
+    date: str
+    time: str
+    doctor_name: str
+    notes: Optional[str] = None
+
+class PrescriptionIn(BaseModel):
+    patient_id: str
+    doctor_name: str
+    medications: List[dict]
+    notes: Optional[str] = None
+
+class MedicalRecordIn(BaseModel):
+    patient_id: str
+    record_type: str
+    content: dict
+    notes: Optional[str] = None
+
+
+@app.post('/api/appointments')
+def create_appointment(payload: AppointmentIn, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    try:
+        appt_data = payload.dict()
+        appt_data['created_by'] = user['id']
+        appt_id = data_store.save_appointment(appt_data)
+        return {'id': appt_id, 'status': 'scheduled'}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating appointment: {str(e)}")
+
+@app.get('/api/appointments')
+def list_appointments(
+    status: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.get_appointments(user_id=user['id'], status=status, page=page, page_size=page_size)
+
+@app.put('/api/appointments/{appointment_id}')
+def update_appointment_endpoint(appointment_id: str, updates: dict, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    if not data_store.update_appointment(appointment_id, updates):
+        raise HTTPException(status_code=404, detail='Appointment not found')
+    return {'ok': True}
+
+@app.delete('/api/appointments/{appointment_id}')
+def cancel_appointment_endpoint(appointment_id: str, reason: str = '', authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    if not data_store.cancel_appointment(appointment_id, reason):
+        raise HTTPException(status_code=404, detail='Appointment not found')
+    return {'ok': True, 'status': 'cancelled'}
+
+
+@app.post('/api/prescriptions')
+def create_prescription(payload: PrescriptionIn, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    try:
+        rx_data = payload.dict()
+        rx_data['prescribed_by'] = user['id']
+        rx_id = data_store.save_prescription(rx_data)
+        return {'id': rx_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating prescription: {str(e)}")
+
+@app.get('/api/prescriptions')
+def list_prescriptions(
+    is_active: Optional[bool] = None,
+    page: int = 1,
+    page_size: int = 20,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.get_prescriptions(patient_id=user['id'], is_active=is_active, page=page, page_size=page_size)
+
+@app.delete('/api/prescriptions/{prescription_id}')
+def deactivate_prescription_endpoint(prescription_id: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    if not data_store.deactivate_prescription(prescription_id):
+        raise HTTPException(status_code=404, detail='Prescription not found')
+    return {'ok': True, 'status': 'deactivated'}
+
+
+@app.post('/api/medical-records')
+def create_medical_record(payload: MedicalRecordIn, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    try:
+        record_data = payload.dict()
+        record_data['created_by'] = user['id']
+        record_id = data_store.save_medical_record(record_data)
+        return {'id': record_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating medical record: {str(e)}")
+
+@app.get('/api/medical-records')
+def list_medical_records(
+    record_type: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.get_medical_records(patient_id=user['id'], record_type=record_type, page=page, page_size=page_size)
+
+
+@app.get('/api/search/cases')
+def search_cases_endpoint(
+    q: str,
+    severity: Optional[str] = None,
+    status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    filters = {}
+    if severity:
+        filters['severity'] = severity
+    if status:
+        filters['status'] = status
+    if date_from:
+        filters['date_from'] = date_from
+    if date_to:
+        filters['date_to'] = date_to
+    return data_store.search_cases(q, filters=filters, page=page, page_size=page_size)
+
+@app.get('/api/search/users')
+def search_users_endpoint(
+    q: str,
+    page: int = 1,
+    page_size: int = 20,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.search_users(q, page=page, page_size=page_size)
+
+
+@app.get('/api/audit-logs')
+def get_audit_logs_endpoint(
+    event_type: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    authorization: Optional[str] = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.get_audit_logs(event_type=event_type, user_id=user['id'], start_date=start_date, end_date=end_date, page=page, page_size=page_size)
+
+
+@app.post('/api/backup/create')
+def create_backup_endpoint(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    try:
+        archive_path = data_store.create_backup()
+        return {'backup_path': archive_path, 'status': 'created'}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating backup: {str(e)}")
+
+@app.get('/api/backup/list')
+def list_backups_endpoint(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.list_backups()
+
+@app.post('/api/backup/restore')
+def restore_backup_endpoint(archive_path: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    if not data_store.restore_backup(archive_path):
+        raise HTTPException(status_code=404, detail='Backup file not found')
+    return {'ok': True, 'status': 'restored'}
+
+
+@app.get('/api/stats')
+def get_data_stats_endpoint(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.get_data_stats()
+
+
+@app.post('/api/soft-delete/{entity_type}/{entity_id}')
+def soft_delete_endpoint(entity_type: str, entity_id: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    data_store.soft_delete(entity_type, entity_id, deleted_by=user['id'])
+    return {'ok': True, 'status': 'deleted'}
+
+@app.post('/api/soft-delete/restore/{entity_type}/{entity_id}')
+def restore_soft_delete_endpoint(entity_type: str, entity_id: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    if not data_store.restore_soft_delete(entity_type, entity_id):
+        raise HTTPException(status_code=404, detail='Soft delete record not found')
+    return {'ok': True, 'status': 'restored'}
+
+
+@app.post('/api/migrate/add-default-fields')
+def migrate_add_default_fields_endpoint(entity_type: str, defaults: dict, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.migrate_add_default_fields(entity_type, defaults)
+
+@app.post('/api/migrate/remove-orphaned-records')
+def migrate_remove_orphaned_records_endpoint(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    return data_store.migrate_remove_orphaned_records()
+
+
+@app.get('/api/export/{entity_type}')
+def export_to_csv_endpoint(entity_type: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='Authorization header required')
+    token = authorization.split('Bearer')[-1].strip()
+    user = data_store.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail='Invalid token')
+    try:
+        data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
+        output_path = os.path.join(data_dir, f"{entity_type}_export.csv")
+        path = data_store.export_to_csv(entity_type, output_path)
+        return {'export_path': path, 'status': 'exported'}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exporting data: {str(e)}")
