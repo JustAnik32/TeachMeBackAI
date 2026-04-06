@@ -26,7 +26,7 @@ ADMIN_CODE = os.environ.get('MICROCLINIC_ADMIN_CODE', 'adminpass')
 # AI Configuration
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
-OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'openai/gpt-4o')
+OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'z-ai/glm-5')
 
 # Google Sign-In Configuration
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
