@@ -47,6 +47,20 @@
       .topic-btn{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:20px;text-align:left;cursor:pointer;transition:all 0.3s ease;font-size:14px;color:var(--text-primary);font-weight:500}
       .topic-btn:hover{background:rgba(99,102,241,0.2);border-color:rgba(99,102,241,0.5);transform:translateY(-4px);box-shadow:0 12px 30px rgba(99,102,241,0.3)}
       .topic-btn.selected{background:linear-gradient(135deg,#6366f1,#ec4899);border-color:transparent;box-shadow:0 8px 30px rgba(99,102,241,0.5)}
+      
+      /* Agent Selection Styles */
+      .agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+      .agent-card{background:rgba(255,255,255,0.05);border:2px solid rgba(255,255,255,0.1);border-radius:16px;padding:16px;text-align:center;cursor:pointer;transition:all 0.3s ease;font-size:13px}
+      .agent-card:hover{background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.4);transform:translateY(-2px)}
+      .agent-card.selected{background:linear-gradient(135deg,rgba(99,102,241,0.3),rgba(236,72,153,0.3));border-color:#6366f1;box-shadow:0 4px 20px rgba(99,102,241,0.3)}
+      .agent-icon{font-size:32px;margin-bottom:8px}
+      .agent-name{font-weight:600;color:var(--text-primary);margin-bottom:4px}
+      .agent-desc{font-size:11px;color:var(--text-secondary);line-height:1.4}
+      .agent-indicator{position:absolute;top:-8px;right:-8px;width:24px;height:24px;background:linear-gradient(135deg,#10b981,#06b6d4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;color:white;opacity:0;transition:opacity 0.3s}
+      .agent-card.selected .agent-indicator{opacity:1}
+      
+      /* Active Agent Display */
+      .active-agent{display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);border-radius:12px;margin-bottom:12px;font-size:13px}
       .custom-topic{width:100%;padding:20px 24px;border-radius:16px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--text-primary);font-size:16px;margin-top:20px;transition:all 0.3s ease}
       .custom-topic:focus{outline:none;border-color:#6366f1;box-shadow:0 0 20px rgba(99,102,241,0.3)}
       .custom-topic::placeholder{color:var(--text-secondary)}
@@ -216,6 +230,25 @@
             </select>
           </div>
           
+          <!-- Multi-Agent Selection -->
+          <div style="margin-top:24px">
+            <label class="muted" style="display:block;margin-bottom:12px">Select Teaching Agents (Choose 1-3):</label>
+            <div class="agent-grid" id="agentGrid">
+              <!-- Agents will be loaded here -->
+            </div>
+          </div>
+          
+          <!-- Workflow Mode -->
+          <div style="margin-top:20px">
+            <label class="muted">Workflow Mode:</label>
+            <select id="workflowMode" style="padding:12px 20px;border-radius:12px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--text-primary);margin-left:12px;font-size:14px">
+              <option value="single">Single Agent</option>
+              <option value="round_robin">Round Robin (Agents Rotate)</option>
+              <option value="adaptive">Adaptive (Smart Handoff)</option>
+              <option value="panel">Panel (All Respond)</option>
+            </select>
+          </div>
+          
           <button class="btn" style="margin-top:28px" onclick="startSession()">Start Teaching →</button>
         </div>
       </div>
@@ -381,6 +414,66 @@
         "Chemical Bonds"
       ]
 
+      // Selected agents for multi-agent workflow
+      let selectedAgents = ['curious_student']
+      let availableAgents = []
+      let currentAgentIndex = 0
+
+      async function loadAgents() {
+        try {
+          const res = await fetch(API + '/teachmeback/agents')
+          if (res.ok) {
+            const data = await res.json()
+            availableAgents = data.agents
+            renderAgentGrid()
+          }
+        } catch (e) {
+          console.error('Failed to load agents:', e)
+          // Use default agents if API fails
+          availableAgents = [
+            {id: 'curious_student', name: 'Alex the Curious Student', icon: '🧑‍🎓', description: 'Asks thoughtful questions'},
+            {id: 'expert_reviewer', name: 'Dr. Elena the Expert', icon: '👩‍🔬', description: 'Validates technical accuracy'},
+            {id: 'socratic_guide', name: 'Socrates the Guide', icon: '🧙‍♂️', description: 'Uses Socratic questioning'},
+            {id: 'peer_learner', name: 'Jamie the Peer', icon: '🙋', description: 'Relatable fellow student'},
+            {id: 'quiz_master', name: 'Quiz Master Quinn', icon: '🎮', description: 'Tests with fun challenges'},
+            {id: 'devils_advocate', name: "Devil's Advocate", icon: '😈', description: 'Challenges assumptions'}
+          ]
+          renderAgentGrid()
+        }
+      }
+
+      function renderAgentGrid() {
+        const grid = document.getElementById('agentGrid')
+        grid.innerHTML = ''
+        availableAgents.forEach(agent => {
+          const card = document.createElement('div')
+          card.className = 'agent-card' + (selectedAgents.includes(agent.id) ? ' selected' : '')
+          card.style.position = 'relative'
+          card.innerHTML = `
+            <div class="agent-indicator">✓</div>
+            <div class="agent-icon">${agent.icon}</div>
+            <div class="agent-name">${agent.name}</div>
+            <div class="agent-desc">${agent.description}</div>
+          `
+          card.onclick = () => toggleAgent(agent.id, card)
+          grid.appendChild(card)
+        })
+      }
+
+      function toggleAgent(agentId, card) {
+        if (selectedAgents.includes(agentId)) {
+          selectedAgents = selectedAgents.filter(id => id !== agentId)
+          card.classList.remove('selected')
+        } else {
+          if (selectedAgents.length >= 3) {
+            alert('You can select up to 3 agents')
+            return
+          }
+          selectedAgents.push(agentId)
+          card.classList.add('selected')
+        }
+      }
+
       function init() {
         const grid = document.getElementById('topicGrid')
         topics.forEach(topic => {
@@ -392,6 +485,9 @@
           }
           grid.appendChild(btn)
         })
+        
+        // Load available agents
+        loadAgents()
       }
 
       let isSessionActive = false
@@ -399,10 +495,16 @@
       async function startSession() {
         const topic = document.getElementById('customTopic').value.trim()
         const level = document.getElementById('userLevel').value
+        const workflowMode = document.getElementById('workflowMode').value
         const startBtn = document.querySelector('.btn[onclick="startSession()"]')
         
         if (!topic) {
           alert('Please select or enter a topic')
+          return
+        }
+
+        if (selectedAgents.length === 0) {
+          alert('Please select at least one teaching agent')
           return
         }
 
@@ -418,7 +520,12 @@
           const res = await fetch(API + '/teachmeback/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic, user_level: level })
+            body: JSON.stringify({ 
+              topic, 
+              user_level: level,
+              selected_agents: selectedAgents,
+              workflow_mode: workflowMode
+            })
           })
           
           const data = await res.json()
@@ -431,6 +538,11 @@
             
             const messages = document.getElementById('messages')
             messages.innerHTML = ''
+            
+            // Show active agent if returned
+            if (data.active_agent) {
+              showActiveAgent(data.active_agent)
+            }
             
             addMessage(data.message, 'ai')
             addMessage('📝 ' + data.instructions, 'ai')
@@ -448,6 +560,18 @@
           startBtn.textContent = 'Start Teaching'
           startBtn.disabled = false
         }
+      }
+
+      function showActiveAgent(agent) {
+        const container = document.getElementById('chatContainer')
+        const agentDisplay = document.createElement('div')
+        agentDisplay.id = 'activeAgentDisplay'
+        agentDisplay.className = 'active-agent'
+        agentDisplay.innerHTML = `
+          <span style="font-size:18px">${agent.icon}</span>
+          <span>Current Agent: <strong>${agent.name}</strong></span>
+        `
+        container.insertBefore(agentDisplay, container.firstChild.nextSibling)
       }
 
       function addMessage(text, sender) {
@@ -502,6 +626,27 @@
           const data = await res.json()
           
           if (res.ok) {
+            // Handle agent switch notification
+            if (data.active_agent && data.active_agent.switched) {
+              const switchNotice = document.createElement('div')
+              switchNotice.className = 'message ai'
+              switchNotice.style.background = 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(236,72,153,0.3))'
+              switchNotice.style.borderColor = 'rgba(99,102,241,0.5)'
+              switchNotice.style.textAlign = 'center'
+              switchNotice.innerHTML = `<span style="font-size:18px">${data.active_agent.icon}</span> <strong>${data.active_agent.name}</strong> has joined the conversation!`
+              messages.appendChild(switchNotice)
+              messages.scrollTop = messages.scrollHeight
+              
+              // Update active agent display
+              const agentDisplay = document.getElementById('activeAgentDisplay')
+              if (agentDisplay) {
+                agentDisplay.innerHTML = `
+                  <span style="font-size:18px">${data.active_agent.icon}</span>
+                  <span>Current Agent: <strong>${data.active_agent.name}</strong></span>
+                `
+              }
+            }
+            
             // Add AI response
             addMessage(data.message, 'ai')
             
