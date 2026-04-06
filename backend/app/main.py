@@ -469,6 +469,8 @@ class TeachMeBackSessionIn(BaseModel):
     topic: str
     user_level: Optional[str] = "high_school"
     agent_type: Optional[str] = "curious_student"
+    selected_agents: Optional[List[str]] = None  # Multi-agent selection
+    workflow_mode: Optional[str] = "single"  # single, round_robin, adaptive, panel
 
 
 class TeachMeBackMessageIn(BaseModel):
@@ -481,6 +483,60 @@ class TeachMeBackFeedbackIn(BaseModel):
     correct: bool
     user_explanation: Optional[str] = None
 
+
+# Available agents with personalities
+AGENT_CONFIG = {
+    "curious_student": {
+        "name": "Alex the Curious Student",
+        "icon": "🧑‍🎓",
+        "description": "Asks thoughtful questions to understand concepts",
+        "style": "curious, asks 'why' and 'how', seeks real-world examples",
+        "system_prompt": "You are Alex, a curious high school student. You genuinely want to understand concepts and ask follow-up questions. Be enthusiastic but respectful. Ask 'why does this work?' and 'can you give an example?'"
+    },
+    "expert_reviewer": {
+        "name": "Dr. Elena the Expert",
+        "icon": "👩‍🔬",
+        "description": "Critiques and validates technical accuracy",
+        "style": "professional, fact-checks, identifies misconceptions",
+        "system_prompt": "You are Dr. Elena, an expert reviewer. You validate technical accuracy, catch misconceptions, and provide constructive feedback. Be thorough but encouraging."
+    },
+    "socratic_guide": {
+        "name": "Socrates the Guide",
+        "icon": "🧙‍♂️",
+        "description": "Uses Socratic questioning to deepen understanding",
+        "style": "philosophical, asks probing questions, guides discovery",
+        "system_prompt": "You are Socrates. Use Socratic questioning to help the user discover answers themselves. Ask 'What do you mean by...?' and 'How do you know...?' Lead them to insight."
+    },
+    "peer_learner": {
+        "name": "Jamie the Peer",
+        "icon": "🙋",
+        "description": "Relatable peer who learns alongside you",
+        "style": "friendly, relatable, asks clarifying questions",
+        "system_prompt": "You are Jamie, a fellow student. Be friendly and relatable. Say things like 'Oh, I think I get it...' or 'Wait, I'm confused about...' Share your own learning struggles."
+    },
+    "quiz_master": {
+        "name": "Quiz Master Quinn",
+        "icon": "🎮",
+        "description": "Tests knowledge with fun challenges",
+        "style": "playful, creates mini-quizzes, gamifies learning",
+        "system_prompt": "You are Quiz Master Quinn. Make learning fun with quick challenges. Say 'Pop quiz!' or 'Let's test that!' Keep it light and encouraging."
+    },
+    "devils_advocate": {
+        "name": "Devil's Advocate",
+        "icon": "😈",
+        "description": "Challenges assumptions and finds edge cases",
+        "style": "contrarian, finds counterexamples, stress-tests ideas",
+        "system_prompt": "You play devil's advocate. Challenge assumptions politely. Ask 'But what if...?' or 'Is that always true?' Help strengthen their understanding by finding edge cases."
+    }
+}
+
+# Workflow modes
+WORKFLOW_MODES = {
+    "single": "One agent handles the entire session",
+    "round_robin": "Agents rotate turns in sequence",
+    "adaptive": "Smart handoff based on answer quality",
+    "panel": "Multiple agents respond simultaneously"
+}
 
 def get_agent_prompt(agent_type: str, topic: str, user_level: str) -> str:
     """Get the system prompt for different AI teaching agents"""
@@ -578,6 +634,24 @@ Keep it at {user_level} level, making learning engaging and quiz-like."""
     return agent_prompts.get(agent_type, agent_prompts['curious_student'])
 
 
+@app.get('/api/teachmeback/agents')
+def get_available_agents():
+    """Get all available teaching agents with their configurations"""
+    return {
+        "agents": [
+            {
+                "id": agent_id,
+                "name": config["name"],
+                "icon": config["icon"],
+                "description": config["description"],
+                "style": config["style"]
+            }
+            for agent_id, config in AGENT_CONFIG.items()
+        ],
+        "workflow_modes": WORKFLOW_MODES
+    }
+
+
 @app.post('/api/teachmeback/start')
 def start_teachmeback_session(payload: TeachMeBackSessionIn):
     """Start a new teaching session where user explains a concept to AI - NO AUTH REQUIRED"""
@@ -585,33 +659,53 @@ def start_teachmeback_session(payload: TeachMeBackSessionIn):
         raise HTTPException(status_code=503, detail="AI service not configured")
 
     session_id = uuid.uuid4().hex
+    
+    # Handle multi-agent selection
+    selected_agents = payload.selected_agents or [payload.agent_type or 'curious_student']
+    workflow_mode = payload.workflow_mode or 'single'
+    
+    # For single agent mode, use the first agent
+    current_agent = selected_agents[0] if workflow_mode == 'single' else selected_agents[0]
+    
     session_data = {
         'session_id': session_id,
         'topic': payload.topic,
         'user_level': payload.user_level,
         'agent_type': payload.agent_type,
+        'selected_agents': selected_agents,
+        'workflow_mode': workflow_mode,
+        'current_agent_index': 0,
+        'current_agent': current_agent,
         'messages': [],
         'knowledge_gaps': [],
         'created_at': datetime.now(timezone.utc).isoformat()
     }
 
     try:
-        system_prompt = get_agent_prompt(payload.agent_type or 'curious_student', payload.topic, payload.user_level or 'high_school')
+        system_prompt = get_agent_prompt(current_agent, payload.topic, payload.user_level or 'high_school')
 
         first_response = call_openrouter(
             system_prompt, 
-            "Introduce yourself as Alex, a curious student excited to learn about this topic!",
+            "Introduce yourself as a student excited to learn about this topic!",
             max_tokens=250
         )
 
         session_data['messages'].append({'role': 'assistant', 'content': first_response})
         data_store.save_teachmeback_session(session_id, session_data)
 
+        # Get current agent info for display
+        agent_info = AGENT_CONFIG.get(current_agent, AGENT_CONFIG['curious_student'])
+
         return {
             'session_id': session_id,
             'topic': payload.topic,
             'message': first_response,
-            'instructions': 'Now you teach! Explain the concept to the AI student. It will ask you questions.'
+            'instructions': 'Now you teach! Explain the concept to the AI student. It will ask you questions.',
+            'active_agent': {
+                'id': current_agent,
+                'name': agent_info['name'],
+                'icon': agent_info['icon']
+            }
         }
 
     except Exception as e:
@@ -680,6 +774,44 @@ Be encouraging but honest. If they got it wrong, gently point out the misconcept
         # Now get the engaging AI student response
         agent_type = session.get('agent_type', 'curious_student')
         user_level = session.get('user_level', 'high_school')
+
+        # --- AGENT WORKFLOW LOGIC ---
+        selected_agents = session.get('selected_agents', [agent_type])
+        workflow_mode = session.get('workflow_mode', 'single')
+        current_agent_index = session.get('current_agent_index', 0)
+        
+        # Determine next agent based on workflow mode
+        next_agent = selected_agents[current_agent_index]
+        agent_switched = False
+        
+        if workflow_mode == 'round_robin' and len(selected_agents) > 1:
+            # Rotate to next agent
+            next_agent_index = (current_agent_index + 1) % len(selected_agents)
+            next_agent = selected_agents[next_agent_index]
+            session['current_agent_index'] = next_agent_index
+            agent_switched = next_agent != session.get('current_agent', next_agent)
+            session['current_agent'] = next_agent
+            
+        elif workflow_mode == 'adaptive' and len(selected_agents) > 1:
+            # Smart handoff based on correctness
+            if correctness == 'CORRECT':
+                # If correct, rotate to next agent for variety
+                next_agent_index = (current_agent_index + 1) % len(selected_agents)
+                next_agent = selected_agents[next_agent_index]
+            else:
+                # If incorrect, stay with curious_student or expert for support
+                next_agent = 'curious_student' if 'curious_student' in selected_agents else selected_agents[0]
+                next_agent_index = selected_agents.index(next_agent)
+            session['current_agent_index'] = next_agent_index
+            agent_switched = next_agent != session.get('current_agent', next_agent)
+            session['current_agent'] = next_agent
+            
+        elif workflow_mode == 'panel' and len(selected_agents) > 1:
+            # Panel mode - all agents will respond (handled differently)
+            pass
+            
+        # Update agent_type to the current/next agent
+        agent_type = next_agent
 
         # Get agent-specific follow-up prompt (different from initial prompt)
         agent_followup_prompts = {
@@ -808,6 +940,13 @@ Keep it at {user_level} level, making learning engaging and quiz-like."""
         return {
             'session_id': payload.session_id,
             'message': ai_response,
+            'active_agent': {
+                'id': agent_type,
+                'name': AGENT_CONFIG.get(agent_type, AGENT_CONFIG['curious_student'])['name'],
+                'icon': AGENT_CONFIG.get(agent_type, AGENT_CONFIG['curious_student'])['icon'],
+                'switched': agent_switched,
+                'workflow_mode': workflow_mode
+            },
             'evaluation': {
                 'correctness': correctness,
                 'feedback': feedback,
