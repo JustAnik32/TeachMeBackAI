@@ -26,7 +26,7 @@ ADMIN_CODE = os.environ.get('MICROCLINIC_ADMIN_CODE', 'adminpass')
 # AI Configuration
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
-OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'nvidia/nemotron-3-super-120b-a12b:free')
+OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'openai/gpt-4o')
 
 # Google Sign-In Configuration
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
@@ -140,10 +140,8 @@ def call_openrouter(system_prompt: str, user_prompt: str, max_tokens: int = 300)
 
     # Prepend instruction to suppress chain-of-thought in the output
     enhanced_system_prompt = (
-        "STRICT RULE: You are acting as a character. NEVER output any thinking, planning, or reasoning. "
-        "NEVER describe what you are doing. NEVER mention 'the user', 'the teacher', or 'the student'. "
-        "JUST be the character and speak naturally. Start responding immediately in character. "
-        "NO meta-commentary. NO explanations of your behavior.\n\n"
+        "IMPORTANT: Do NOT output your internal thinking or planning. "
+        "Respond ONLY with your final answer in character.\n\n"
         + system_prompt
     )
 
