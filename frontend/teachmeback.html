@@ -667,9 +667,9 @@
               
               let evalMessage = `${evalEmoji} ${data.evaluation.correctness.replace(/_/g, ' ')}`
               if (data.evaluation.feedback) {
-                evalMessage += `\n💡 ${data.evaluation.feedback}`
+                evalMessage += `||${data.evaluation.feedback}`
               }
-              
+
               addMessage(evalMessage, 'evaluation')
             }
             

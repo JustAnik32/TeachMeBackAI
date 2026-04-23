@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header, Depends
+﻿from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import os
@@ -26,82 +26,109 @@ ADMIN_CODE = os.environ.get('MICROCLINIC_ADMIN_CODE', 'adminpass')
 # AI Configuration
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
-OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'z-ai/glm-5')
+OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'nvidia/nemotron-3-super-120b-a12b:free')
 
 # Google Sign-In Configuration
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 
-
 def clean_ai_response(text: str) -> str:
-    """Strip internal chain-of-thought / reasoning from AI model responses.
-    
-    Some models (e.g. nvidia/nemotron) leak their thinking process into the
-    response content.  This function removes common reasoning patterns so only
-    the final, user-facing answer remains.
-    """
-    import re
-
+    """SUPER AGGRESSIVE: Strip ALL thinking process from AI responses."""
     if not text:
         return text
 
-    # 1. Remove <think>...</think> or <reasoning>...</reasoning> blocks
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    text = re.sub(r'<reasoning>.*?</reasoning>', '', text, flags=re.DOTALL)
-    text = re.sub(r'<thought>.*?</thought>', '', text, flags=re.DOTALL)
+    import re
 
-    # 2. Remove lines that look like internal monologue
-    #    e.g. "Okay, the user wants me to...", "Hmm, I need to craft...",
-    #         "Let me think about...", "I should..."
-    thinking_patterns = [
-        r'^Okay,?\s+(the user|so|let me|I need|I should|I\'ll|I want|they).*$',
-        r'^Hmm,?\s+.*$',
-        r'^Let me (think|consider|craft|plan|figure|break|analyze).*$',
-        r'^I need to.*$',
-        r'^I should.*$',
-        r'^I\'ll .*$',
-        r'^Wait,?\s+(the|I|let).*$',
-        r'^So,?\s+(the user|I need|I should|let me|first).*$',
-        r'^First,?\s+I.*$',
-        r'^Now,?\s+(I need|let me|I should|for the|I\'ll).*$',
-        r'^For the (intro|question|response|answer|reply),?\s+I.*$',
-        r'^Gotta .*$',
-        r'^Maybe I.*$',
-        r'^Actually,?\s+(I|the|let).*$',
-        r'^They (specified|want|asked|said).*$',
+    # Define bad prefixes that indicate thinking - remove lines starting with these
+    bad_prefixes = [
+        'for the', 'the user', 'the pupil', 'this aligns', 'adding',
+        'okay,', 'okay ', 'hmm', 'let me', 'i need', 'i should',
+        'i will', "i'll", 'i want', 'first,', 'next,', 'then,',
+        'finally,', 'so,', 'wait,', 'actually,', 'maybe', 'perhaps',
+        'well,', 'now,', 'here,', 'this is', 'that is', 'it is',
+        'i think', 'i believe', 'i feel', 'i guess', 'i suppose',
+        'sounds like', 'looks like', 'seems like', 'appears that',
+        'thinking', 'reasoning', 'planning', 'crafting',
+        'as alex', 'so as', 'as the', 'as a student', 'as a teacher',
+        'i must', 'i should not', 'i shouldn', 'important:',
+        'alex would', 'the character', 'the ai',
+        'in character', 'out of character', 'stay in',
+        'instead,', 'directly.', 'never say', 'never fake',
+        'react genuinely', 'show surprise', 'express polite',
+        'admitted uncertainty', 'i shouldn', 'i must not',
+        'the teacher', 'the student', 'a confused',
+        'confused-but-eager', 'to test if', 'to keep it',
+        'not confrontational', 'humble; never',
     ]
-    
+
+    # Also remove full-line patterns anywhere in text
+    full_line_patterns = [
+        r'^.*the user is simulating.*$',
+        r'^.*classroom interaction.*$',
+        r'^.*follow-up question.*$',
+        r'^.*which is probably.*$',
+        r'^.*intentional to test.*$',
+        r'^.*so as.*i must.*$',
+        r'^.*react genuinely.*$',
+        r'^.*since the teacher.*$',
+        r'^.*i should(n|\'t| not).*pretend.*$',
+        r'^.*instead, express.*$',
+        r'^.*stay excited.*$',
+        r'^.*never fake.*$',
+        r'^.*alex would never.*$',
+        r'^.*to keep it curious.*$',
+        r'^.*also$',
+    ]
+
     lines = text.split('\n')
-    cleaned_lines = []
-    in_thinking_block = True  # Assume thinking might be at the start
-    
+    cleaned = []
+    first_real_line_found = False
+
     for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            if not in_thinking_block:
-                cleaned_lines.append(line)
+        stripped_lower = line.strip().lower()
+
+        # Skip empty lines at start
+        if not stripped_lower and not cleaned:
             continue
-        
-        is_thinking = False
-        for pattern in thinking_patterns:
-            if re.match(pattern, stripped, re.IGNORECASE):
-                is_thinking = True
+
+        # Check if line starts with bad thinking prefix (only at start)
+        is_bad = False
+        if not first_real_line_found:
+            for prefix in bad_prefixes:
+                if stripped_lower.startswith(prefix):
+                    is_bad = True
+                    break
+
+        # Check full-line patterns anywhere
+        for pattern in full_line_patterns:
+            if re.match(pattern, stripped_lower, re.IGNORECASE):
+                is_bad = True
                 break
-        
-        if is_thinking and in_thinking_block:
-            # Skip thinking lines at the start
+
+        if is_bad:
             continue
-        else:
-            # Once we hit a non-thinking line, stop filtering
-            in_thinking_block = False
-            cleaned_lines.append(line)
-    
-    result = '\n'.join(cleaned_lines).strip()
-    
-    # If cleaning removed everything, return the original (safety fallback)
+
+        first_real_line_found = True
+        cleaned.append(line)
+
+    result = '\n'.join(cleaned).strip()
+
+    # If result is empty, try to salvage something
     if not result:
-        return text.strip()
-    
-    return result
+        sentences = re.split(r'[.!?]+', text)
+        for s in sentences:
+            s = s.strip()
+            if len(s) > 20:
+                is_bad_sentence = False
+                for prefix in bad_prefixes:
+                    if s.lower().startswith(prefix):
+                        is_bad_sentence = True
+                        break
+                if not is_bad_sentence:
+                    result = s
+                    break
+
+    return result if result else "Could you explain that again? I want to make sure I understand."
+
 
 
 def call_openrouter(system_prompt: str, user_prompt: str, max_tokens: int = 300) -> str:
@@ -113,9 +140,10 @@ def call_openrouter(system_prompt: str, user_prompt: str, max_tokens: int = 300)
 
     # Prepend instruction to suppress chain-of-thought in the output
     enhanced_system_prompt = (
-        "IMPORTANT: Do NOT output your internal thinking, reasoning, or planning process. "
-        "Respond ONLY with your final answer in character. Never start with phrases like "
-        "'Okay, the user wants...', 'Let me think...', 'I need to...', etc.\n\n"
+        "STRICT RULE: You are acting as a character. NEVER output any thinking, planning, or reasoning. "
+        "NEVER describe what you are doing. NEVER mention 'the user', 'the teacher', or 'the student'. "
+        "JUST be the character and speak naturally. Start responding immediately in character. "
+        "NO meta-commentary. NO explanations of your behavior.\n\n"
         + system_prompt
     )
 
