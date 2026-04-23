@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import os
@@ -32,12 +32,93 @@ OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'z-ai/glm-5')
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 
 
+def clean_ai_response(text: str) -> str:
+    """Strip internal chain-of-thought / reasoning from AI model responses.
+    
+    Some models (e.g. nvidia/nemotron) leak their thinking process into the
+    response content.  This function removes common reasoning patterns so only
+    the final, user-facing answer remains.
+    """
+    import re
+
+    if not text:
+        return text
+
+    # 1. Remove <think>...</think> or <reasoning>...</reasoning> blocks
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    text = re.sub(r'<reasoning>.*?</reasoning>', '', text, flags=re.DOTALL)
+    text = re.sub(r'<thought>.*?</thought>', '', text, flags=re.DOTALL)
+
+    # 2. Remove lines that look like internal monologue
+    #    e.g. "Okay, the user wants me to...", "Hmm, I need to craft...",
+    #         "Let me think about...", "I should..."
+    thinking_patterns = [
+        r'^Okay,?\s+(the user|so|let me|I need|I should|I\'ll|I want|they).*$',
+        r'^Hmm,?\s+.*$',
+        r'^Let me (think|consider|craft|plan|figure|break|analyze).*$',
+        r'^I need to.*$',
+        r'^I should.*$',
+        r'^I\'ll .*$',
+        r'^Wait,?\s+(the|I|let).*$',
+        r'^So,?\s+(the user|I need|I should|let me|first).*$',
+        r'^First,?\s+I.*$',
+        r'^Now,?\s+(I need|let me|I should|for the|I\'ll).*$',
+        r'^For the (intro|question|response|answer|reply),?\s+I.*$',
+        r'^Gotta .*$',
+        r'^Maybe I.*$',
+        r'^Actually,?\s+(I|the|let).*$',
+        r'^They (specified|want|asked|said).*$',
+    ]
+    
+    lines = text.split('\n')
+    cleaned_lines = []
+    in_thinking_block = True  # Assume thinking might be at the start
+    
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if not in_thinking_block:
+                cleaned_lines.append(line)
+            continue
+        
+        is_thinking = False
+        for pattern in thinking_patterns:
+            if re.match(pattern, stripped, re.IGNORECASE):
+                is_thinking = True
+                break
+        
+        if is_thinking and in_thinking_block:
+            # Skip thinking lines at the start
+            continue
+        else:
+            # Once we hit a non-thinking line, stop filtering
+            in_thinking_block = False
+            cleaned_lines.append(line)
+    
+    result = '\n'.join(cleaned_lines).strip()
+    
+    # If cleaning removed everything, return the original (safety fallback)
+    if not result:
+        return text.strip()
+    
+    return result
+
+
 def call_openrouter(system_prompt: str, user_prompt: str, max_tokens: int = 300) -> str:
     """Make API call using OpenRouter"""
     if not OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="OpenRouter API key not configured")
     
     import requests
+
+    # Prepend instruction to suppress chain-of-thought in the output
+    enhanced_system_prompt = (
+        "IMPORTANT: Do NOT output your internal thinking, reasoning, or planning process. "
+        "Respond ONLY with your final answer in character. Never start with phrases like "
+        "'Okay, the user wants...', 'Let me think...', 'I need to...', etc.\n\n"
+        + system_prompt
+    )
+
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "HTTP-Referer": "http://localhost:8000",
@@ -46,7 +127,7 @@ def call_openrouter(system_prompt: str, user_prompt: str, max_tokens: int = 300)
     payload = {
         "model": OPENROUTER_MODEL,
         "messages": [
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": enhanced_system_prompt},
             {"role": "user", "content": user_prompt}
         ],
         "max_tokens": max_tokens
@@ -66,7 +147,8 @@ def call_openrouter(system_prompt: str, user_prompt: str, max_tokens: int = 300)
     
     try:
         result = response.json()
-        return result['choices'][0]['message']['content']
+        raw_content = result['choices'][0]['message']['content']
+        return clean_ai_response(raw_content)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI response parsing error: {str(e)}. Response: {response.text[:200]}")
 
